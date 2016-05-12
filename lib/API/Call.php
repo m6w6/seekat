@@ -2,12 +2,16 @@
 
 namespace seekat\API;
 
-use seekat\API;
+use Exception;
 use http\Client;
 use http\Client\Request;
 use http\Client\Response;
+use React\Promise\Deferred;
+use seekat\API;
+use SplObserver;
+use SplSubject;
 
-class Deferred extends \React\Promise\Deferred implements \SplObserver
+class Call extends Deferred implements SplObserver
 {
 	/**
 	 * The endpoint
@@ -17,19 +21,19 @@ class Deferred extends \React\Promise\Deferred implements \SplObserver
 
 	/**
 	 * The HTTP client
-	 * @var \http\Client
+	 * @var Client
 	 */
 	private $client;
 
 	/**
 	 * The executed request
-	 * @var \http\Client\Request
+	 * @var Request
 	 */
 	private $request;
 
 	/**
 	 * The promised response
-	 * @var \http\Client\Response
+	 * @var Response
 	 */
 	private $response;
 
@@ -37,20 +41,22 @@ class Deferred extends \React\Promise\Deferred implements \SplObserver
 	 * Create a deferred promise for the response of $request
 	 *
 	 * @var \seekat\API $api The endpoint of the request
-	 * @var \http\Client $client The HTTP client to send the request
-	 * @var \http\Client\Request The request to execute
+	 * @var Client $client The HTTP client to send the request
+	 * @var Request The request to execute
 	 */
 	function __construct(API $api, Client $client, Request $request) {
 		$this->api = $api;
 		$this->client = $client;
 		$this->request = $request;
 
-		$client->attach($this);
-		$client->enqueue($request);
-
 		parent::__construct(function($resolve, $reject) {
 			return $this->cancel($resolve, $reject);
 		});
+		
+		$client->attach($this);
+		$client->enqueue($request);
+		/* start off */
+		$client->once();
 	}
 
 	/**
@@ -58,11 +64,11 @@ class Deferred extends \React\Promise\Deferred implements \SplObserver
 	 *
 	 * Import the response's data on success and resolve the promise.
 	 *
-	 * @var \SplSubject $client The observed HTTP client
-	 * @var \http\Client\Request The request which generated the update
+	 * @var SplSubject $client The observed HTTP client
+	 * @var Request The request which generated the update
 	 * @var object $progress The progress information
 	 */
-	function update(\SplSubject $client, Request $request = null, $progress = null) {
+	function update(SplSubject $client, Request $request = null, $progress = null) {
 		if ($request !== $this->request) {
 			return;
 		}
@@ -89,7 +95,7 @@ class Deferred extends \React\Promise\Deferred implements \SplObserver
 		if ($this->response) {
 			try {
 				$resolve($this->api->import($this->response));
-			} catch (\Exception $e) {
+			} catch (Exception $e) {
 				$reject($e);
 			}
 		} else {

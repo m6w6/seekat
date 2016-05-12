@@ -19,6 +19,7 @@ use Psr\Log\NullLogger;
 use React\Promise\ExtendedPromiseInterface;
 use function React\Promise\resolve;
 use function React\Promise\reject;
+use function React\Promise\map;
 
 class API implements \IteratorAggregate, \Countable {
 	/**
@@ -459,27 +460,33 @@ class API implements \IteratorAggregate, \Countable {
 	}
 	
 	/**
-	 * Run the send loop once
+	 * Run the send loop through a generator
 	 *
-	 * @param callable $timeout as function(\seekat\API $api) : float, returning any applicable select timeout
-	 * @return bool
+	 * @param callable|\Generator $cbg A \Generator or a factory of a \Generator yielding promises
+	 * @return \React\Promise\ExtendedPromiseInterface The promise of the generator's return value
 	 */
-	function __invoke(callable $timeout = null) : bool {
+	function __invoke($cbg) : ExtendedPromiseInterface {
 		$this->__log->debug(__FUNCTION__);
 		
-		if (count($this->__client)) {
-			if ($this->__client->once()) {
-				if ($timeout) {
-					$timeout = $timeout($this);
-				}
-				
-				$this->__log->debug(__FUNCTION__.": wait", compact("timeout"));
-				
-				$this->__client->wait($timeout);
-				return 0 < count($this->__client);
-			}
+		$invoker = new API\Invoker($this->__client);
+
+		if ($cbg instanceof \Generator) {
+			return $invoker->iterate($cbg)->promise();
 		}
-		return false;
+
+		if (is_callable($cbg)) {
+			return $invoker->invoke(function() use($cbg) {
+				return $cbg($this);
+			})->promise();
+		}
+
+		throw \InvalidArgumentException(
+			"Expected callable or Generator, got ".(
+				is_object($cbg)
+					? "instance of ".get_class($cbg)
+					: gettype($cbg).": ".var_export($cbg, true)
+			)
+		);
 	}
 	
 	/**
@@ -552,6 +559,6 @@ class API implements \IteratorAggregate, \Countable {
 			"headers" => $headers,
 		]);
 		
-		return (new API\Deferred($this, $this->__client, $request))->promise();
+		return (new API\Call($this, $this->__client, $request))->promise();
 	}
 }
