@@ -84,7 +84,7 @@ class API implements \IteratorAggregate, \Countable {
 	 * Ascend one level deep into the API endpoint
 	 *
 	 * @var string|int $seg The "path" element to ascend into
- * @return \seekat\API Endpoint clone referring to {$parent}/{$seg}
+	 * @return \seekat\API Endpoint clone referring to {$parent}/{$seg}
 	 */
 	function __get($seg) : API {
 		if (substr($seg, -4) === "_url") {
@@ -139,7 +139,7 @@ class API implements \IteratorAggregate, \Countable {
 			return $this->$method->get(...$args);
 		}
 		
-	/* fetch resource, unless already localized, and try for {$method}_url */
+		/* fetch resource, unless already localized, and try for {$method}_url */
 		return $this->$method->get(...$args)->otherwise(function($error) use($method, $args) {
 			if ($this->exists($method."_url", $url)) {
 				

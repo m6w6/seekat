@@ -7,8 +7,8 @@ use http\Client;
 use http\Client\Request;
 use http\Client\Response;
 
-class Deferred extends \React\Promise\Deferred implements \SplObserver {
-
+class Deferred extends \React\Promise\Deferred implements \SplObserver
+{
 	/**
 	 * The endpoint
 	 * @var \seekat\API

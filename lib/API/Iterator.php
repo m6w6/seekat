@@ -4,7 +4,8 @@ namespace seekat\API;
 
 use seekat\API;
 
-class Iterator implements \Iterator {
+class Iterator implements \Iterator
+{
 	/**
 	 * The endpoint
 	 * @var \seekat\API
