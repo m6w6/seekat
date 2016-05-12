@@ -1,0 +1,30 @@
+{
+    "name": "m6w6/seekat",
+    "description": "seekat wraps github api in php",
+    "keywords": ["seekat", "github api", "api", "php"],
+    "license": "BSD-2-Clause",
+    "authors": [
+        {
+            "name": "Michael Wallner",
+            "email": "mike@php.net"
+        }
+    ],
+    "autoload": {
+        "psr-4": {
+            "seekat\\": "lib/"
+        }
+    },
+    "require": {
+        "php": "^7.0",
+        "ext-http": "^3.0",
+        "react/promise": "^2.4",
+        "seebz/uri-template": "dev-master",
+		"psr/log": "^1.0"
+    },
+    "require-dev": {
+        "peridot-php/peridot": "^1.15",
+        "monolog/monolog": "^1.19",
+        "peridot-php/leo": "^1.5",
+        "peridot-php/peridot-code-coverage-reporters": "^2.0"
+    }
+}
