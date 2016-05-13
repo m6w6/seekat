@@ -1,0 +1,28 @@
+sudo: false
+
+language: php
+
+php:
+  - 7.0
+  - nightly
+
+matrix:
+  allow_failures:
+  - php: nightly
+  fast_finish: true
+
+env:
+  global:
+    secure: ERa0ulc7muiHY22BMmsKAO+dqQXTnq/UO0ulYiDeJcpv22b/YdzvwkUnwX1qwU1Rs0h/eyk4qBWr7shNoXcNLUGU6+LBT3UsHabhMrQW50HRqPFI7DO7xcHdP2ae9kDLCREJRKh2yqqTgLex4nT4aBez0X0PK5pnX+6PyRE10ww=
+
+install:
+  - pecl install pecl_http
+  - composer self-update
+  - composer install
+
+script:
+  - php ./vendor/bin/peridot
+
+cache:
+  directories:
+    - "$HOME/.composer/cache"
