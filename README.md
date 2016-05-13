@@ -1,6 +1,7 @@
 # seekat
 
 Fluent Github API access with PHP-7 and [ext-http](https://github.com/m6w6/ext-http).
+[![Build Status](https://travis-ci.org/m6w6/seekat.svg)](https://travis-ci.org/m6w6/seekat)
 
 ```php
 <?php
