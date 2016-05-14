@@ -17,6 +17,7 @@ class ContentType
 		"html"		=> "self::fromData",
 		"diff"		=> "self::fromData",
 		"patch"		=> "self::fromData",
+		"text/plain"=> "self::fromData",
 	];
 
 	private $type;
