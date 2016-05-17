@@ -66,7 +66,7 @@ class Invoker extends Deferred
 			if ($this->cancelled) {
 				break;
 			}
-			$this->queue($promise, $gen);
+			$this->give($promise, $gen);
 		}
 
 		if (!$this->cancelled) {
@@ -87,24 +87,20 @@ class Invoker extends Deferred
 	/**
 	 * Promise handler
 	 * 
-	 * @param \React\Promise\PromiseInterface $promise
-	 * @param \Generator $to
+	 * @param array|\React\Promise\PromiseInterface $promise
+	 * @param \Generator $gen
 	 */
-	private function give(PromiseInterface $promise, Generator $to) {
-		$promise->then(function($result) use($to) {
-			if (($promise = $to->send($result))) {
-				$this->queue($promise, $to);
-			}
-		});
-	}
-
-	private function queue($promise, Generator $gen) {
+	private function give($promise, Generator $gen) {
 		if ($promise instanceof PromiseInterface) {
-				$this->give($promise, $gen);
+			$promise->then(function($result) use($gen) {
+				if (($promise = $gen->send($result))) {
+					$this->give($promise, $gen);
+				}
+			});
 		} else {
 			all($promise)->then(function($results) use($gen) {
 				if (($promise = $gen->send($results))) {
-					$this->queue($promise, $gen);
+					$this->give($promise, $gen);
 				}
 			});
 		}
