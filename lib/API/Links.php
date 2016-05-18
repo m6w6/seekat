@@ -2,19 +2,23 @@
 
 namespace seekat\API;
 
-use http\Header;
-use http\Params;
-use http\QueryString;
-use http\Url;
+use http\ {
+	Header,
+	Params,
+	QueryString,
+	Url
+};
+use Serializable;
+use UnexpectedValueException;
 
-class Links implements \Serializable
+class Links implements Serializable
 {
 	/**
 	 * Parsed "Link" relations
-	 * @var \http\Params
+	 * @var Params
 	 */
 	private $params;
-	
+
 	/**
 	 * Parsed "Link" relations
 	 * @var array
@@ -24,23 +28,33 @@ class Links implements \Serializable
 	/**
 	 * Parse the hypermedia link header
 	 *
-	 * @var string $header_value The value of the "Link" header
+	 * @param Header $links The Link header
+	 * @throws UnexpectedValueException
 	 */
 	function __construct(Header $links) {
 		if (strcasecmp($links->name, "Link")) {
-			throw new \UnexpectedValueException("Expected 'Link' header, got: '{$links->name}'");
+			throw new UnexpectedValueException("Expected 'Link' header, got: '{$links->name}'");
 		}
 		$this->unserialize($links->value);
 	}
 
+	/**
+	 * @return string
+	 */
 	function __toString() : string {
 		return $this->serialize();
 	}
 
+	/**
+	 * @return string
+	 */
 	function serialize() {
 		return (string) $this->params;
 	}
 
+	/**
+	 * @param string $links
+	 */
 	function unserialize($links) {
 		$this->params = new Params($links, ",", ";", "=",
 			Params::PARSE_RFC5988 | Params::PARSE_ESCAPED);
@@ -65,7 +79,7 @@ class Links implements \Serializable
 	 *
 	 * Returns the link's "last" relation if it exists and "next" is not set.
 	 *
-	 * @return \http\Url
+	 * @return Url
 	 */
 	function getNext() {
 		if (isset($this->relations["next"])) {
@@ -82,7 +96,7 @@ class Links implements \Serializable
 	 *
 	 * Returns the link's "first" relation if it exists and "prev" is not set.
 	 *
-	 * @return \http\Url
+	 * @return Url
 	 */
 	function getPrev() {
 		if (isset($this->relations["prev"])) {
@@ -97,7 +111,7 @@ class Links implements \Serializable
 	/**
 	 * Get the URL of the link's "last" relation
 	 *
-	 * @return \http\Url
+	 * @return Url
 	 */
 	function getLast() {
 		if (isset($this->relations["last"])) {
@@ -109,7 +123,7 @@ class Links implements \Serializable
 	/**
 	 * Get the URL of the link's "first" relation
 	 *
-	 * @return \http\Url
+	 * @return Url
 	 */
 	function getFirst() {
 		if (isset($this->relations["first"])) {

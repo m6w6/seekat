@@ -2,13 +2,15 @@
 
 namespace seekat\API;
 
+use http\Url;
+use Iterator as BaseIterator;
 use seekat\API;
 
-class Iterator implements \Iterator
+class Iterator implements BaseIterator
 {
 	/**
 	 * The endpoint
-	 * @var \seekat\API
+	 * @var API
 	 */
 	private $api;
 
@@ -33,7 +35,7 @@ class Iterator implements \Iterator
 	/**
 	 * Create a new iterator over $data returning \seekat\API instances
 	 *
-	 * @var \seekat\API $api The endpoint
+	 * @var API $api The endpoint
 	 * @var array|object $data
 	 */
 	function __construct(API $api) {
@@ -53,7 +55,7 @@ class Iterator implements \Iterator
 	/**
 	 * Get the current data entry
 	 *
-	 * @return \seekat\API
+	 * @return API
 	 */
 	function current() {
 		return $this->cur;
@@ -63,7 +65,7 @@ class Iterator implements \Iterator
 		if (list($key, $cur) = each($this->data)) {
 			$this->key = $key;
 			if ($this->api->$key->exists("url", $url)) {
-				$url = new \http\Url($url);
+				$url = new Url($url);
 				$this->cur = $this->api->withUrl($url)->withData($cur);
 			} else {
 				$this->cur = $this->api->$key->withData($cur);

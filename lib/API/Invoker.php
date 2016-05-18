@@ -4,11 +4,12 @@ namespace seekat\API;
 
 use Generator;
 use http\Client;
-use React\Promise\Deferred;
-use React\Promise\PromiseInterface;
-use React\Promise\ExtendedPromiseInterface;
-
-use function React\Promise\all;
+use React\Promise\{
+	Deferred,
+	ExtendedPromiseInterface,
+	PromiseInterface,
+	function all
+};
 
 class Invoker extends Deferred
 {
@@ -32,7 +33,7 @@ class Invoker extends Deferred
 
 	/**
 	 * Create a new generator invoker
-	 * @param \http\Client $client
+	 * @param Client $client
 	 */
 	function __construct(Client $client) {
 		$this->client = $client;
@@ -45,8 +46,8 @@ class Invoker extends Deferred
 	/**
 	 * Invoke $generator to create a \Generator which yields promises
 	 *
-	 * @param callable $generator as function() : \Generator, creating a generator yielding promises
-	 * @return \seekat\API\Invoker
+	 * @param callable $generator as function():\Generator, creating a generator yielding promises
+	 * @return Invoker
 	 */
 	function invoke(callable $generator) : Invoker {
 		$this->iterate($generator());
@@ -56,8 +57,8 @@ class Invoker extends Deferred
 	/**
 	 * Iterate over $gen, a \Generator yielding promises
 	 *
-	 * @param \Generator $gen
-	 * @return \seekat\API\Invoker
+	 * @param Generator $gen
+	 * @return Invoker
 	 */
 	function iterate(Generator $gen) : Invoker {
 		$this->cancelled = false;
@@ -77,8 +78,8 @@ class Invoker extends Deferred
 
 	/**
 	 * Get the generator's result
-	 * 
-	 * @return \React\Promise\ExtendedPromiseInterface
+	 *
+	 * @return ExtendedPromiseInterface
 	 */
 	function result() : ExtendedPromiseInterface {
 		return $this->promise();
@@ -86,9 +87,9 @@ class Invoker extends Deferred
 
 	/**
 	 * Promise handler
-	 * 
-	 * @param array|\React\Promise\PromiseInterface $promise
-	 * @param \Generator $gen
+	 *
+	 * @param array|PromiseInterface $promise
+	 * @param Generator $gen
 	 */
 	private function give($promise, Generator $gen) {
 		if ($promise instanceof PromiseInterface) {

@@ -14,7 +14,7 @@ $api = new API([
 	"Authorization" => "token ".getenv("GITHUB_TOKEN")
 ], null, $cli, $log);
 
-$api(function() use($api) {
+$api(function($api) {
 	$count = 0;
 	$events = yield $api->repos->m6w6->{"ext-http"}->issues->events();
 	while ($events) {

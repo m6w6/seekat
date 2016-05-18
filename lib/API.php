@@ -2,90 +2,104 @@
 
 namespace seekat;
 
-use seekat\API\ContentType;
-use seekat\Exception\RequestException;
+use Countable;
+use Generator;
+use http\{
+	Client,
+	Client\Request,
+	Client\Response,
+	Header,
+	Message\Body,
+	QueryString,
+	Url
+};
+use InvalidArgumentException;
+use IteratorAggregate;
+use Psr\Log\{
+	LoggerInterface,
+	NullLogger
+};
+use seekat\{
+	API\Call,
+	API\ContentType,
+	API\Invoker,
+	API\Iterator,
+	API\Links,
+	Exception\RequestException
+};
+use React\Promise\{
+	ExtendedPromiseInterface,
+	function reject,
+	function resolve
+};
+use Throwable;
+use UnexpectedValueException;
 
-use http\Url;
-use http\Header;
-use http\Client;
-use http\Client\Request;
-use http\Client\Response;
-use http\Message\Body;
-use http\QueryString;
-
-use Psr\Log\LoggerInterface;
-use Psr\Log\NullLogger;
-
-use React\Promise\ExtendedPromiseInterface;
-use function React\Promise\resolve;
-use function React\Promise\reject;
-use function React\Promise\map;
-
-class API implements \IteratorAggregate, \Countable {
+class API implements IteratorAggregate, Countable {
 	/**
 	 * The current API endpoint URL
-	 * @var \http\Url
+	 * @var Url
 	 */
 	private $__url;
-	
+
 	/**
 	 * Logger
-	 * @var \Psr\Log\LoggerInterface
+	 * @var LoggerInterface
 	 */
 	private $__log;
-	
+
 	/**
 	 * The HTTP client
-	 * @var \http\Client
+	 * @var Client
 	 */
 	private $__client;
-	
+
 	/**
 	 * Default headers to send out to the API endpoint
 	 * @var array
 	 */
 	private $__headers;
-	
+
 	/**
 	 * Current endpoint data's Content-Type
-	 * @var \http\Header
+	 * @var Header
 	 */
 	private $__type;
-	
+
 	/**
 	 * Current endpoint's data
 	 * @var array|object
 	 */
 	private $__data;
-	
+
 	/**
 	 * Current endpoints links
-	 * @var seekat\API\Links
+	 * @var Links
 	 */
 	private $__links;
-	
+
 	/**
 	 * Create a new API endpoint root
 	 *
-	 * @var array $headers Standard request headers, defaults to ["Accept" => "application/vnd.github.v3+json"]
-	 * @var \http\Url The API's endpoint, defaults to https://api.github.com
-	 * @var \http\Client $client The HTTP client to use for executing requests
-	 * @var \Psr\Log\LoggerInterface $log A logger
+	 * @param array $headers Standard request headers, defaults to ["Accept" => "application/vnd.github.v3+json"]
+	 * @param Url $url The API's endpoint, defaults to https://api.github.com
+	 * @param Client $client The HTTP client to use for executing requests
+	 * @param LoggerInterface $log A logger
 	 */
 	function __construct(array $headers = null, Url $url = null, Client $client = null, LoggerInterface $log = null) {
 		$this->__log = $log ?? new NullLogger;
 		$this->__url = $url ?? new Url("https://api.github.com");
 		$this->__client = $client ?? new Client;
 		$this->__headers = (array) $headers + [
-		"Accept" => "application/vnd.github.v3+json"
+			"Accept" => "application/vnd.github.v3+json"
 		];
 	}
-	
+
 	/**
 	 * Ascend one level deep into the API endpoint
 	 *
-	 * @var string|int $seg The "path" element to ascend into
-	 * @return \seekat\API Endpoint clone referring to {$parent}/{$seg}
+	 * @param string|int $seg The "path" element to ascend into
+	 * @return API Endpoint clone referring to {$parent}/{$seg}
 	 */
 	function __get($seg) : API {
 		if (substr($seg, -4) === "_url") {
@@ -97,34 +111,34 @@ class API implements \IteratorAggregate, \Countable {
 			$that->__url->path .= "/".urlencode($seg);
 			$this->exists($seg, $that->__data);
 		}
-		
+
 		$this->__log->debug(__FUNCTION__."($seg)", [
 			"url" => [
 				(string) $this->__url,
 				(string) $that->__url
 			],
 		]);
-		
+
 		return $that;
 	}
-	
+
 	/**
 	 * Call handler that actually queues a data fetch and returns a promise
 	 *
-	 * @var string $method The API's "path" element to ascend into
-	 * @var array $args Array of arguments forwarded to \seekat\API::get()
-	 * @return \React\Promise\ExtendedPromiseInterface
+	 * @param string $method The API's "path" element to ascend into
+	 * @param array $args Array of arguments forwarded to \seekat\API::get()
+	 * @return ExtendedPromiseInterface
 	 */
 	function __call(string $method, array $args) : ExtendedPromiseInterface {
 		/* We cannot implement an explicit then() method,
 		 * because the Promise implementation might think
 		 * we're actually implementing Thenable,
-		 * which might cause an infite loop.
+		 * which might cause an infinite loop.
 		 */
 		if ($method === "then") {
 			return $this->get()->then(...$args);
 		}
-		
+
 		/*
 		 * very short-hand version:
 		 * ->users->m6w6->gists->get()->then(...)
@@ -134,39 +148,39 @@ class API implements \IteratorAggregate, \Countable {
 		if (is_callable(current($args))) {
 			return $this->$method->get()->then(current($args));
 		}
-		
+
 		/* standard access */
 		if ($this->exists($method)) {
 			return $this->$method->get(...$args);
 		}
-		
+
 		/* fetch resource, unless already localized, and try for {$method}_url */
-		return $this->$method->get(...$args)->otherwise(function($error) use($method, $args) {
+		return $this->$method->get(...$args)->otherwise(function(Throwable $error) use($method, $args) {
 			if ($this->exists($method."_url", $url)) {
-				
+
 				$this->__log->info(__FUNCTION__."($method): ". $error->getMessage(), [
 					"url" => (string) $this->__url
 				]);
-				
+
 				$url = new Url(uri_template($url, (array) current($args)));
 				return $this->withUrl($url)->get(...$args);
 			}
-			
+
 			$this->__log->error(__FUNCTION__."($method): ". $error->getMessage(), [
 				"url" => (string) $this->__url
 			]);
-			
+
 			throw $error;
 		});
 	}
-	
+
 	/**
 	 * Clone handler ensuring the underlying url will be cloned, too
 	 */
 	function __clone() {
 		$this->__url = clone $this->__url;
 	}
-	
+
 	/**
 	 * The string handler for the endpoint's data
 	 *
@@ -176,36 +190,37 @@ class API implements \IteratorAggregate, \Countable {
 		if (is_scalar($this->__data)) {
 			return (string) $this->__data;
 		}
-		
+
 		/* FIXME */
 		return json_encode($this->__data);
 	}
-	
+
 	/**
 	 * Import handler for the endpoint's underlying data
 	 *
-	 * \seekat\Deferred will call this when the request will have finished.
+	 * \seekat\Call will call this when the request will have finished.
 	 *
-	 * @var \http\Client\Response $response
-	 * @return \seekat\API self
+	 * @param Response $response
+	 * @return API self
+	 * @throws UnexpectedValueException
+	 * @throws RequestException
+	 * @throws \Exception
 	 */
 	function import(Response $response) : API {
-		//addcslashes($response, "\0..\40\42\47\134\140\177..\377")
-		
 		$this->__log->info(__FUNCTION__.": ". $response->getInfo(), [
 			"url" => (string) $this->__url
 		]);
-		
+
 		if ($response->getResponseCode() >= 400) {
 			$e = new RequestException($response);
-			
+
 			$this->__log->critical(__FUNCTION__.": ".$e->getMessage(), [
 				"url" => (string) $this->__url,
 			]);
-			
+
 			throw $e;
 		}
-		
+
 		if (!($type = $response->getHeader("Content-Type", Header::class))) {
 			$e = new RequestException($response);
 			$this->__log->error(
@@ -214,65 +229,66 @@ class API implements \IteratorAggregate, \Countable {
 			]);
 			throw $e;
 		}
-		
+
 		try {
 			$this->__type = new ContentType($type);
 			$this->__data = $this->__type->parseBody($response->getBody());
-			
+
 			if (($link = $response->getHeader("Link", Header::class))) {
-				$this->__links = new API\Links($link);
+				$this->__links = new Links($link);
 			}
 		} catch (\Exception $e) {
 			$this->__log->error(__FUNCTION__.": ".$e->getMessage(), [
 				"url" => (string) $this->__url
 			]);
-			
+
 			throw $e;
 		}
-		
+
 		return $this;
 	}
-	
+
 	/**
 	 * Export the endpoint's underlying data
 	 *
+	 * @param
 	 * @return mixed
 	 */
 	function export(&$type = null) {
 		$type = clone $this->__type;
 		return $this->__data;
 	}
-	
+
 	/**
 	 * Create a copy of the endpoint with specific data
 	 *
-	 * @var mixed $data
-	 * @return \seekat\API clone
+	 * @param mixed $data
+	 * @return API clone
 	 */
 	function withData($data) : API {
 		$that = clone $this;
 		$that->__data = $data;
 		return $that;
 	}
-	
+
 	/**
 	 * Create a copy of the endpoint with a specific Url, but with data reset
 	 *
-	 * @var \http\Url $url
-	 * @return \seekat\API clone
+	 * @param Url $url
+	 * @return API clone
 	 */
 	function withUrl(Url $url) : API {
 		$that = $this->withData(null);
 		$that->__url = $url;
 		return $that;
 	}
-	
+
 	/**
 	 * Create a copy of the endpoint with a specific header added/replaced
 	 *
-	 * @var string $name
-	 * @var mixed $value
-	 * @return \seekat\API clone
+	 * @param string $name
+	 * @param mixed $value
+	 * @return API clone
 	 */
 	function withHeader(string $name, $value) : API {
 		$that = clone $this;
@@ -283,16 +299,15 @@ class API implements \IteratorAggregate, \Countable {
 		}
 		return $that;
 	}
-	
+
 	/**
 	 * Create a copy of the endpoint with a customized accept header
 	 *
-	 * Changes the returned endpoint's accept header to
- * 	"application/vnd.github.v3.{$type}"
+	 * Changes the returned endpoint's accept header to "application/vnd.github.v3.{$type}"
 	 *
-	 * @var string $type The expected return data type, e.g. "raw", "html", etc.
-	 * @var bool $keepdata Whether to keep already fetched data
-	 * @return \seekat\API clone
+	 * @param string $type The expected return data type, e.g. "raw", "html", etc.
+	 * @param bool $keepdata Whether to keep already fetched data
+	 * @return API clone
 	 */
 	function as(string $type, bool $keepdata = true) : API {
 		switch(substr($type, 0, 1)) {
@@ -311,16 +326,16 @@ class API implements \IteratorAggregate, \Countable {
 		}
 		return $that;
 	}
-	
+
 	/**
 	 * Create an iterator over the endpoint's underlying data
 	 *
-	 * @return \seekat\API\Iterator
+	 * @return Iterator
 	 */
-	function getIterator() : API\Iterator {
-		return new API\Iterator($this);
+	function getIterator() : Iterator {
+		return new Iterator($this);
 	}
-	
+
 	/**
 	 * Count the underlying data's entries
 	 *
@@ -329,78 +344,78 @@ class API implements \IteratorAggregate, \Countable {
 	function count() : int {
 		return count($this->__data);
 	}
-	
+
 	/**
 	 * Perform a GET request against the endpoint's underlying URL
 	 *
-	 * @var mixed $args The HTTP query string parameters
-	 * @var array $headers The request's additional HTTP headers
-	 * @return \React\Promise\ExtendedPromiseInterface
+	 * @param mixed $args The HTTP query string parameters
+	 * @param array $headers The request's additional HTTP headers
+	 * @return ExtendedPromiseInterface
 	 */
 	function get($args = null, array $headers = null) : ExtendedPromiseInterface {
 		return $this->__xfer("GET", $args, null, $headers);
 	}
-	
+
 	/**
 	 * Perform a DELETE request against the endpoint's underlying URL
 	 *
-	 * @var mixed $args The HTTP query string parameters
-	 * @var array $headers The request's additional HTTP headers
-	 * @return \React\Promise\ExtendedPromiseInterface
+	 * @param mixed $args The HTTP query string parameters
+	 * @param array $headers The request's additional HTTP headers
+	 * @return ExtendedPromiseInterface
 	 */
 	function delete($args = null, array $headers = null) : ExtendedPromiseInterface {
 		return $this->__xfer("DELETE", $args, null, $headers);
 	}
-	
+
 	/**
 	 * Perform a POST request against the endpoint's underlying URL
 	 *
-	 * @var mixed $body The HTTP message's body
-	 * @var mixed $args The HTTP query string parameters
-	 * @var array $headers The request's additional HTTP headers
-	 * @return \React\Promise\ExtendedPromiseInterface
+	 * @param mixed $body The HTTP message's body
+	 * @param mixed $args The HTTP query string parameters
+	 * @param array $headers The request's additional HTTP headers
+	 * @return ExtendedPromiseInterface
 	 */
 	function post($body = null, $args = null, array $headers = null) : ExtendedPromiseInterface {
 		return $this->__xfer("POST", $args, $body, $headers);
 	}
-	
+
 	/**
 	 * Perform a PUT request against the endpoint's underlying URL
 	 *
-	 * @var mixed $body The HTTP message's body
-	 * @var mixed $args The HTTP query string parameters
-	 * @var array $headers The request's additional HTTP headers
-	 * @return \React\Promise\ExtendedPromiseInterface
+	 * @param mixed $body The HTTP message's body
+	 * @param mixed $args The HTTP query string parameters
+	 * @param array $headers The request's additional HTTP headers
+	 * @return ExtendedPromiseInterface
 	 */
 	function put($body = null, $args = null, array $headers = null) : ExtendedPromiseInterface {
 		return $this->__xfer("PUT", $args, $body, $headers);
 	}
-	
+
 	/**
 	 * Perform a PATCH request against the endpoint's underlying URL
 	 *
-	 * @var mixed $body The HTTP message's body
-	 * @var mixed $args The HTTP query string parameters
-	 * @var array $headers The request's additional HTTP headers
-	 * @return \React\Promise\ExtendedPromiseInterface
+	 * @param mixed $body The HTTP message's body
+	 * @param mixed $args The HTTP query string parameters
+	 * @param array $headers The request's additional HTTP headers
+	 * @return ExtendedPromiseInterface
 	 */
 	function patch($body = null, $args = null, array $headers = null) : ExtendedPromiseInterface {
 		return $this->__xfer("PATCH", $args, $body, $headers);
 	}
-	
+
 	/**
 	 * Accessor to any hypermedia links
 	 *
-	 * @return null|\seekat\API\Links
+	 * @return null|Links
 	 */
 	function links() {
 		return $this->__links;
 	}
-	
+
 	/**
 	 * Perform a GET request against the link's "first" relation
 	 *
-	 * @return \React\Promise\ExtendedPromiseInterface
+	 * @return ExtendedPromiseInterface
 	 */
 	function first() : ExtendedPromiseInterface {
 		if ($this->links() && ($first = $this->links()->getFirst())) {
@@ -408,11 +423,11 @@ class API implements \IteratorAggregate, \Countable {
 		}
 		return reject($this->links());
 	}
-	
+
 	/**
 	 * Perform a GET request against the link's "prev" relation
 	 *
-	 * @return \React\Promise\ExtendedPromiseInterface
+	 * @return ExtendedPromiseInterface
 	 */
 	function prev() : ExtendedPromiseInterface {
 		if ($this->links() && ($prev = $this->links()->getPrev())) {
@@ -420,11 +435,11 @@ class API implements \IteratorAggregate, \Countable {
 		}
 		return reject($this->links());
 	}
-	
+
 	/**
 	 * Perform a GET request against the link's "next" relation
 	 *
-	 * @return \React\Promise\ExtendedPromiseInterface
+	 * @return ExtendedPromiseInterface
 	 */
 	function next() : ExtendedPromiseInterface {
 		if ($this->links() && ($next = $this->links()->getNext())) {
@@ -432,11 +447,11 @@ class API implements \IteratorAggregate, \Countable {
 		}
 		return reject($this->links());
 	}
-	
+
 	/**
 	 * Perform a GET request against the link's "last" relation
 	 *
-	 * @return \React\Promise\ExtendedPromiseInterface
+	 * @return ExtendedPromiseInterface
 	 */
 	function last() : ExtendedPromiseInterface {
 		if ($this->links() && ($last = $this->links()->getLast())) {
@@ -444,11 +459,11 @@ class API implements \IteratorAggregate, \Countable {
 		}
 		return reject($this->links());
 	}
-	
+
 	/**
 	 * Perform all queued HTTP transfers
 	 *
-	 * @return \seekat\API self
+	 * @return API self
 	 */
 	function send() : API {
 		$this->__log->debug(__FUNCTION__.": start loop");
@@ -458,19 +473,20 @@ class API implements \IteratorAggregate, \Countable {
 		$this->__log->debug(__FUNCTION__.": end loop");
 		return $this;
 	}
-	
+
 	/**
 	 * Run the send loop through a generator
 	 *
-	 * @param callable|\Generator $cbg A \Generator or a factory of a \Generator yielding promises
-	 * @return \React\Promise\ExtendedPromiseInterface The promise of the generator's return value
+	 * @param callable|Generator $cbg A \Generator or a factory of a \Generator yielding promises
+	 * @return ExtendedPromiseInterface The promise of the generator's return value
+	 * @throws InvalidArgumentException
 	 */
 	function __invoke($cbg) : ExtendedPromiseInterface {
 		$this->__log->debug(__FUNCTION__);
-		
-		$invoker = new API\Invoker($this->__client);
 
-		if ($cbg instanceof \Generator) {
+		$invoker = new Invoker($this->__client);
+
+		if ($cbg instanceof Generator) {
 			return $invoker->iterate($cbg)->promise();
 		}
 
@@ -480,7 +496,7 @@ class API implements \IteratorAggregate, \Countable {
 			})->promise();
 		}
 
-		throw \InvalidArgumentException(
+		throw InvalidArgumentException(
 			"Expected callable or Generator, got ".(
 				is_object($cbg)
 					? "instance of ".get_class($cbg)
@@ -488,12 +504,12 @@ class API implements \IteratorAggregate, \Countable {
 			)
 		);
 	}
-	
+
 	/**
 	 * Check for a specific key in the endpoint's underlying data
 	 *
-	 * @var string $seg
-	 * @var mixed &$val
+	 * @param string $seg
+	 * @param mixed &$val
 	 * @return bool
 	 */
 	function exists($seg, &$val = null) : bool {
@@ -507,7 +523,7 @@ class API implements \IteratorAggregate, \Countable {
 			$val = null;
 			$exists = false;
 		}
-		
+
 		$this->__log->debug(__FUNCTION__."($seg) in ".(
 			is_object($this->__data)
 				? get_class($this->__data)
@@ -520,18 +536,18 @@ class API implements \IteratorAggregate, \Countable {
 			"url" => (string) $this->__url,
 			"val" => $val,
 		]);
-		
+
 		return $exists;
 	}
-	
+
 	/**
 	 * Queue the actual HTTP transfer through \seekat\API\Deferred and return the promise
 	 *
-	 * @var string $method The HTTP request method
-	 * @var mixed $args The HTTP query string parameters
-	 * @var mixed $body Thee HTTP message's body
-	 * @var array $headers The request's additional HTTP headers
-	 * @return \React\Promise\ExtendedPromiseInterface
+	 * @param string $method The HTTP request method
+	 * @param mixed $args The HTTP query string parameters
+	 * @param mixed $body Thee HTTP message's body
+	 * @param array $headers The request's additional HTTP headers
+	 * @return ExtendedPromiseInterface
 	 */
 	private function __xfer(string $method, $args = null, $body = null, array $headers = null) : ExtendedPromiseInterface {
 		if (isset($this->__data)) {
@@ -541,24 +557,24 @@ class API implements \IteratorAggregate, \Countable {
 				"body" => $body,
 				"headers" => $headers,
 			]);
-			
+
 			return resolve($this);
 		}
-		
+
 		$url = $this->__url->mod(["query" => new QueryString($args)]);
 		$request = new Request($method, $url, ((array) $headers) + $this->__headers,
 			 $body = is_array($body) ? json_encode($body) : (
 				is_resource($body) ? new Body($body) : (
 					is_scalar($body) ? (new Body)->append($body) :
 						$body)));
-		
+
 		$this->__log->info(__FUNCTION__."($method) -> request", [
 			"url" => (string) $this->__url,
 			"args" => $this->__url->query,
 			"body" => $body,
 			"headers" => $headers,
 		]);
-		
-		return (new API\Call($this, $this->__client, $request))->promise();
+
+		return (new Call($this, $this->__client, $request))->promise();
 	}
 }

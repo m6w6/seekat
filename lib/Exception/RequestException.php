@@ -2,16 +2,30 @@
 
 namespace seekat\Exception;
 
+use Exception as BaseException;
+use http\ {
+	Client\Response,
+	Header
+};
 use seekat\Exception;
 
-use http\Header;
-use http\Client\Response;
-
-class RequestException extends \Exception implements Exception
+class RequestException extends BaseException implements Exception
 {
+	/**
+	 * JSON errors
+	 * @var array
+	 */
 	private $errors = [];
+
+	/**
+	 * The response of the request which caused the exception
+	 * @var Response
+	 */
 	private $response;
 
+	/**
+	 * @param Response $response
+	 */
 	function __construct(Response $response) {
 		$this->response = $response;
 
@@ -36,10 +50,19 @@ class RequestException extends \Exception implements Exception
 		parent::__construct($message, $response->getResponseCode(), null);
 	}
 
+	/**
+	 * Get JSON errors
+	 * @return array
+	 */
 	function getErrors() : array {
 		return $this->errors;
 	}
 
+	/**
+	 * Combine any errors into a single string
+	 * @staticvar array $reasons
+	 * @return string
+	 */
 	function getErrorsAsString() {
 		static $reasons = [
 			"missing" => "The resource %1\$s does not exist\n",
@@ -63,6 +86,9 @@ class RequestException extends \Exception implements Exception
 		return $errors;
 	}
 
+	/**
+	 * @return string
+	 */
 	function __toString() : string {
 		return parent::__toString() . "\n". $this->getErrorsAsString();
 	}
