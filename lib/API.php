@@ -3,6 +3,7 @@
 namespace seekat;
 
 use Countable;
+use Exception;
 use Generator;
 use http\{
 	Client,
@@ -155,10 +156,16 @@ class API implements IteratorAggregate, Countable {
 		}
 
 		/* fetch resource, unless already localized, and try for {$method}_url */
-		return $this->$method->get(...$args)->otherwise(function(Throwable $error) use($method, $args) {
+		return $this->$method->get(...$args)->otherwise(function($error) use($method, $args) {
+			if ($error instanceof Throwable) {
+				$message = $error->getMessage();
+			} else {
+				$message = $error;
+				$error = new Exception($error);
+			}
 			if ($this->exists($method."_url", $url)) {
 
-				$this->__log->info(__FUNCTION__."($method): ". $error->getMessage(), [
+				$this->__log->info(__FUNCTION__."($method): ". $message, [
 					"url" => (string) $this->__url
 				]);
 
@@ -166,7 +173,7 @@ class API implements IteratorAggregate, Countable {
 				return $this->withUrl($url)->get(...$args);
 			}
 
-			$this->__log->error(__FUNCTION__."($method): ". $error->getMessage(), [
+			$this->__log->error(__FUNCTION__."($method): ". $message, [
 				"url" => (string) $this->__url
 			]);
 

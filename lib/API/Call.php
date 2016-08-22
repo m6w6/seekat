@@ -56,7 +56,14 @@ class Call extends Deferred implements SplObserver
 		});
 
 		$client->attach($this);
-		$client->enqueue($request);
+		$client->enqueue($request, function(Response $response) {
+			$this->response = $response;
+			$this->complete(
+				[$this, "resolve"],
+				[$this, "reject"]
+			);
+			return true;
+		});
 		/* start off */
 		$client->once();
 	}
@@ -76,14 +83,6 @@ class Call extends Deferred implements SplObserver
 		}
 
 		$this->notify((object) compact("client", "request", "progress"));
-
-		if ($progress->info === "finished") {
-			$this->response = $this->client->getResponse();
-			$this->complete(
-				[$this, "resolve"],
-				[$this, "reject"]
-			);
-		}
 	}
 
 	/**
@@ -101,10 +100,8 @@ class Call extends Deferred implements SplObserver
 				$reject($e);
 			}
 		} else {
-			$reject($this->client->getTransferInfo($this->request)["error"]);
+			$reject($this->client->getTransferInfo($this->request)->error);
 		}
-
-		$this->client->dequeue($this->request);
 	}
 
 	/**
