@@ -2,8 +2,14 @@ sudo: false
 
 language: php
 
+addons:
+  apt:
+    packages:
+    - libcurl4-gnutls-dev
+
 php:
   - 7.0
+  - 7.1
   - nightly
 
 matrix:
