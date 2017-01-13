@@ -5,6 +5,7 @@ language: php
 addons:
   apt:
     packages:
+    - libgnutls28-dev
     - libcurl4-gnutls-dev
 
 php:
