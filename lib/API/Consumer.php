@@ -11,7 +11,7 @@ use React\Promise\{
 	function all
 };
 
-class Invoker extends Deferred
+class Consumer extends Deferred
 {
 	/**
 	 * The HTTP client
@@ -44,23 +44,12 @@ class Invoker extends Deferred
 	}
 
 	/**
-	 * Invoke $generator to create a \Generator which yields promises
-	 *
-	 * @param callable $generator as function():\Generator, creating a generator yielding promises
-	 * @return Invoker
-	 */
-	function invoke(callable $generator) : Invoker {
-		$this->iterate($generator());
-		return $this;
-	}
-
-	/**
 	 * Iterate over $gen, a \Generator yielding promises
 	 *
 	 * @param Generator $gen
-	 * @return Invoker
+	 * @return ExtendedPromiseInterface
 	 */
-	function iterate(Generator $gen) : Invoker {
+	function __invoke(Generator $gen) : ExtendedPromiseInterface {
 		$this->cancelled = false;
 
 		foreach ($gen as $promise) {
@@ -73,15 +62,7 @@ class Invoker extends Deferred
 		if (!$this->cancelled) {
 			$this->resolve($this->result = $gen->getReturn());
 		}
-		return $this;
-	}
 
-	/**
-	 * Get the generator's result
-	 *
-	 * @return ExtendedPromiseInterface
-	 */
-	function result() : ExtendedPromiseInterface {
 		return $this->promise();
 	}
 

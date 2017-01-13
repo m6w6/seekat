@@ -40,7 +40,7 @@ class Iterator implements BaseIterator
 	 */
 	function __construct(API $api) {
 		$this->api = $api;
-		$this->data = (array) $api->export();
+		$this->data = (array) $api->export()["data"];
 	}
 
 	/**

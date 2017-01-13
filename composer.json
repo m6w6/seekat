@@ -12,14 +12,19 @@
     "autoload": {
         "psr-4": {
             "seekat\\": "lib/"
-        }
+        },
+        "files": [
+            "lib/functions.php"
+        ]
     },
     "require": {
         "php": "^7.0",
         "ext-http": "^3.0",
         "react/promise": "^2.4",
         "seebz/uri-template": "dev-master",
-		"psr/log": "^1.0"
+		"psr/log": "^1.0",
+        "psr/cache": "^1.0",
+        "psr/simple-cache": "^1.0"
     },
     "require-dev": {
         "peridot-php/peridot": "^1.15",

@@ -3,81 +3,69 @@
 namespace seekat;
 
 use Countable;
-use Exception;
 use Generator;
 use http\{
-	Client,
-	Client\Request,
-	Client\Response,
-	Header,
-	Message\Body,
-	QueryString,
-	Url
+	Client, Client\Request, Message\Body, QueryString, Url
 };
-use InvalidArgumentException;
 use IteratorAggregate;
 use Psr\Log\{
-	LoggerInterface,
-	NullLogger
-};
-use seekat\{
-	API\Call,
-	API\ContentType,
-	API\Invoker,
-	API\Iterator,
-	API\Links,
-	Exception\RequestException
+	LoggerInterface, NullLogger
 };
 use React\Promise\{
-	ExtendedPromiseInterface,
-	function reject,
-	function resolve
+	ExtendedPromiseInterface, function resolve
 };
-use Throwable;
-use UnexpectedValueException;
+use seekat\{
+	API\Call, API\Consumer, API\ContentType, API\Iterator, API\Links, Exception\InvalidArgumentException
+};
 
 class API implements IteratorAggregate, Countable {
 	/**
 	 * The current API endpoint URL
 	 * @var Url
 	 */
-	private $__url;
+	private $url;
 
 	/**
 	 * Logger
 	 * @var LoggerInterface
 	 */
-	private $__log;
+	private $logger;
+
+	/**
+	 * Cache
+	 * @var Call\Cache\Service
+	 */
+	private $cache;
 
 	/**
 	 * The HTTP client
 	 * @var Client
 	 */
-	private $__client;
+	private $client;
 
 	/**
 	 * Default headers to send out to the API endpoint
 	 * @var array
 	 */
-	private $__headers;
+	private $headers;
 
 	/**
 	 * Current endpoint data's Content-Type
-	 * @var Header
+	 * @var API\ContentType
 	 */
-	private $__type;
+	private $type;
 
 	/**
 	 * Current endpoint's data
 	 * @var array|object
 	 */
-	private $__data;
+	private $data;
 
 	/**
 	 * Current endpoints links
 	 * @var Links
 	 */
-	private $__links;
+	private $links;
 
 	/**
 	 * Create a new API endpoint root
@@ -87,11 +75,12 @@ class API implements IteratorAggregate, Countable {
 	 * @param Client $client The HTTP client to use for executing requests
 	 * @param LoggerInterface $log A logger
 	 */
-	function __construct(array $headers = null, Url $url = null, Client $client = null, LoggerInterface $log = null) {
-		$this->__log = $log ?? new NullLogger;
-		$this->__url = $url ?? new Url("https://api.github.com");
-		$this->__client = $client ?? new Client;
-		$this->__headers = (array) $headers + [
+	function __construct(array $headers = null, Url $url = null, Client $client = null, LoggerInterface $log = null, Call\Cache\Service $cache = null) {
+		$this->cache = $cache;
+		$this->logger = $log ?? new NullLogger;
+		$this->url = $url ?? new Url("https://api.github.com");
+		$this->client = $client ?? new Client;
+		$this->headers = (array) $headers + [
 			"Accept" => "application/vnd.github.v3+json"
 		];
 	}
@@ -104,19 +93,19 @@ class API implements IteratorAggregate, Countable {
 	 */
 	function __get($seg) : API {
 		if (substr($seg, -4) === "_url") {
-			$url = new Url(uri_template($this->__data->$seg));
+			$url = new Url(uri_template($this->data->$seg));
 			$that = $this->withUrl($url);
-			$seg = basename($that->__url->path);
+			$seg = basename($that->url->path);
 		} else {
 			$that = clone $this;
-			$that->__url->path .= "/".urlencode($seg);
-			$this->exists($seg, $that->__data);
+			$that->url->path .= "/".urlencode($seg);
+			$this->exists($seg, $that->data);
 		}
 
-		$this->__log->debug(__FUNCTION__."($seg)", [
+		$this->logger->debug(__FUNCTION__."($seg)", [
 			"url" => [
-				(string) $this->__url,
-				(string) $that->__url
+				(string) $this->url,
+				(string) $that->url
 			],
 		]);
 
@@ -147,45 +136,48 @@ class API implements IteratorAggregate, Countable {
 		 * ->users->m6w6->gists(...)
 		 */
 		if (is_callable(current($args))) {
-			return $this->$method->get()->then(current($args));
+			return $this->api->get()->then(current($args));
 		}
 
-		/* standard access */
-		if ($this->exists($method)) {
-			return $this->$method->get(...$args);
+		return (new Call($this, $method))($args);
+	}
+
+	/**
+	 * Run the send loop through a generator
+	 *
+	 * @param callable|Generator $cbg A \Generator or a factory of a \Generator yielding promises
+	 * @return ExtendedPromiseInterface The promise of the generator's return value
+	 * @throws InvalidArgumentException
+	 */
+	function __invoke($cbg) : ExtendedPromiseInterface {
+		$this->logger->debug(__FUNCTION__);
+
+		$consumer = new Consumer($this->client);
+
+		invoke:
+		if ($cbg instanceof Generator) {
+			return $consumer($cbg);
 		}
 
-		/* fetch resource, unless already localized, and try for {$method}_url */
-		return $this->$method->get(...$args)->otherwise(function($error) use($method, $args) {
-			if ($error instanceof Throwable) {
-				$message = $error->getMessage();
-			} else {
-				$message = $error;
-				$error = new Exception($error);
-			}
-			if ($this->exists($method."_url", $url)) {
+		if (is_callable($cbg)) {
+			$cbg = $cbg($this);
+			goto invoke;
+		}
 
-				$this->__log->info(__FUNCTION__."($method): ". $message, [
-					"url" => (string) $this->__url
-				]);
-
-				$url = new Url(uri_template($url, (array) current($args)));
-				return $this->withUrl($url)->get(...$args);
-			}
-
-			$this->__log->error(__FUNCTION__."($method): ". $message, [
-				"url" => (string) $this->__url
-			]);
-
-			throw $error;
-		});
+		throw InvalidArgumentException(
+			"Expected callable or Generator, got ".(
+			is_object($cbg)
+				? "instance of ".get_class($cbg)
+				: gettype($cbg).": ".var_export($cbg, true)
+			)
+		);
 	}
 
 	/**
 	 * Clone handler ensuring the underlying url will be cloned, too
 	 */
 	function __clone() {
-		$this->__url = clone $this->__url;
+		$this->url = clone $this->url;
 	}
 
 	/**
@@ -194,144 +186,12 @@ class API implements IteratorAggregate, Countable {
 	 * @return string
 	 */
 	function __toString() : string {
-		if (is_scalar($this->__data)) {
-			return (string) $this->__data;
+		if (is_scalar($this->data)) {
+			return (string) $this->data;
 		}
 
 		/* FIXME */
-		return json_encode($this->__data);
-	}
-
-	/**
-	 * Import handler for the endpoint's underlying data
-	 *
-	 * \seekat\Call will call this when the request will have finished.
-	 *
-	 * @param Response $response
-	 * @return API self
-	 * @throws UnexpectedValueException
-	 * @throws RequestException
-	 * @throws \Exception
-	 */
-	function import(Response $response) : API {
-		$this->__log->info(__FUNCTION__.": ". $response->getInfo(), [
-			"url" => (string) $this->__url
-		]);
-
-		if ($response->getResponseCode() >= 400) {
-			$e = new RequestException($response);
-
-			$this->__log->critical(__FUNCTION__.": ".$e->getMessage(), [
-				"url" => (string) $this->__url,
-			]);
-
-			throw $e;
-		}
-
-		if (!($type = $response->getHeader("Content-Type", Header::class))) {
-			$e = new RequestException($response);
-			$this->__log->error(
-				__FUNCTION__.": Empty Content-Type -> ".$e->getMessage(), [
-				"url" => (string) $this->__url,
-			]);
-			throw $e;
-		}
-
-		try {
-			$this->__type = new ContentType($type);
-			$this->__data = $this->__type->parseBody($response->getBody());
-
-			if (($link = $response->getHeader("Link", Header::class))) {
-				$this->__links = new Links($link);
-			}
-		} catch (\Exception $e) {
-			$this->__log->error(__FUNCTION__.": ".$e->getMessage(), [
-				"url" => (string) $this->__url
-			]);
-
-			throw $e;
-		}
-
-		return $this;
-	}
-
-	/**
-	 * Export the endpoint's underlying data
-	 *
-	 * @param
-	 * @return mixed
-	 */
-	function export(&$type = null) {
-		$type = clone $this->__type;
-		return $this->__data;
-	}
-
-	/**
-	 * Create a copy of the endpoint with specific data
-	 *
-	 * @param mixed $data
-	 * @return API clone
-	 */
-	function withData($data) : API {
-		$that = clone $this;
-		$that->__data = $data;
-		return $that;
-	}
-
-	/**
-	 * Create a copy of the endpoint with a specific Url, but with data reset
-	 *
-	 * @param Url $url
-	 * @return API clone
-	 */
-	function withUrl(Url $url) : API {
-		$that = $this->withData(null);
-		$that->__url = $url;
-		return $that;
-	}
-
-	/**
-	 * Create a copy of the endpoint with a specific header added/replaced
-	 *
-	 * @param string $name
-	 * @param mixed $value
-	 * @return API clone
-	 */
-	function withHeader(string $name, $value) : API {
-		$that = clone $this;
-		if (isset($value)) {
-			$that->__headers[$name] = $value;
-		} else {
-			unset($that->__headers[$name]);
-		}
-		return $that;
-	}
-
-	/**
-	 * Create a copy of the endpoint with a customized accept header
-	 *
-	 * Changes the returned endpoint's accept header to "application/vnd.github.v3.{$type}"
-	 *
-	 * @param string $type The expected return data type, e.g. "raw", "html", etc.
-	 * @param bool $keepdata Whether to keep already fetched data
-	 * @return API clone
-	 */
-	function as(string $type, bool $keepdata = true) : API {
-		switch(substr($type, 0, 1)) {
-		case "+":
-		case ".":
-		case "":
-			break;
-		default:
-			$type = ".$type";
-			break;
-		}
-		$vapi = ContentType::version();
-		$that = $this->withHeader("Accept", "application/vnd.github.v$vapi$type");
-		if (!$keepdata) {
-			$that->__data = null;
-		}
-		return $that;
+		return json_encode($this->data);
 	}
 
 	/**
@@ -349,7 +209,134 @@ class API implements IteratorAggregate, Countable {
 	 * @return int
 	 */
 	function count() : int {
-		return count($this->__data);
+		return count($this->data);
+	}
+
+	/**
+	 * @return Url
+	 */
+	function getUrl() : Url {
+		return $this->url;
+	}
+
+	/**
+	 * @return LoggerInterface
+	 */
+	function getLogger() : LoggerInterface {
+		return $this->logger;
+	}
+
+	/**
+	 * @return Client
+	 */
+	public function getClient(): Client {
+		return $this->client;
+	}
+
+	/**
+	 * @return array|object
+	 */
+	function getData() {
+		return $this->data;
+	}
+
+	/**
+	 * Accessor to any hypermedia links
+	 *
+	 * @return null|Links
+	 */
+	function getLinks() {
+		return $this->links;
+	}
+
+	/**
+	 * Export the endpoint's underlying data
+	 *
+	 * @return array ["url", "data", "type", "links", "headers"]
+	 */
+	function export() : array {
+		$data = $this->data;
+		$url = clone $this->url;
+		$type = clone $this->type;
+		$links = $this->links ? clone $this->links : null;
+		$headers = $this->headers;
+		return compact("url", "data", "type", "links", "headers");
+	}
+
+	/**
+	 * @param $export
+	 * @return API
+	 */
+	function with($export) : API {
+		$that = clone $this;
+		if (is_array($export) || ($export instanceof \ArrayAccess)) {
+			isset($export["url"]) && $that->url = $export["url"];
+			isset($export["data"]) && $that->data = $export["data"];
+			isset($export["type"]) && $that->type = $export["type"];
+			isset($export["links"]) && $that->links = $export["links"];
+			isset($export["headers"]) && $that->headers = $export["headers"];
+		}
+		return $that;
+	}
+
+	/**
+	 * Create a copy of the endpoint with specific data
+	 *
+	 * @param mixed $data
+	 * @return API clone
+	 */
+	function withData($data) : API {
+		$that = clone $this;
+		$that->data = $data;
+		return $that;
+	}
+
+	/**
+	 * Create a copy of the endpoint with a specific Url, but with data reset
+	 *
+	 * @param Url $url
+	 * @return API clone
+	 */
+	function withUrl(Url $url) : API {
+		$that = clone $this;
+		$that->url = $url;
+		$that->data = null;
+		#$that->links = null;
+		return $that;
+	}
+
+	/**
+	 * Create a copy of the endpoint with a specific header added/replaced
+	 *
+	 * @param string $name
+	 * @param mixed $value
+	 * @return API clone
+	 */
+	function withHeader(string $name, $value) : API {
+		$that = clone $this;
+		if (isset($value)) {
+			$that->headers[$name] = $value;
+		} else {
+			unset($that->headers[$name]);
+		}
+		return $that;
+	}
+
+	/**
+	 * Create a copy of the endpoint with a customized accept header
+	 *
+	 * Changes the returned endpoint's accept header to "application/vnd.github.v3.{$type}"
+	 *
+	 * @param string $type The expected return data type, e.g. "raw", "html", ..., or a complete content type
+	 * @param bool $keepdata Whether to keep already fetched data
+	 * @return API clone
+	 */
+	function as(string $type, bool $keepdata = true) : API {
+		$that = ContentType::apply($this, $type);
+		if (!$keepdata) {
+			$that->data = null;
+		}
+		return $that;
 	}
 
 	/**
@@ -359,8 +346,8 @@ class API implements IteratorAggregate, Countable {
 	 * @param array $headers The request's additional HTTP headers
 	 * @return ExtendedPromiseInterface
 	 */
-	function get($args = null, array $headers = null) : ExtendedPromiseInterface {
-		return $this->__xfer("GET", $args, null, $headers);
+	function get($args = null, array $headers = null, $cache = null) : ExtendedPromiseInterface {
+		return $this->request("GET", $args, null, $headers, $cache);
 	}
 
 	/**
@@ -371,7 +358,7 @@ class API implements IteratorAggregate, Countable {
 	 * @return ExtendedPromiseInterface
 	 */
 	function delete($args = null, array $headers = null) : ExtendedPromiseInterface {
-		return $this->__xfer("DELETE", $args, null, $headers);
+		return $this->request("DELETE", $args, null, $headers);
 	}
 
 	/**
@@ -383,7 +370,7 @@ class API implements IteratorAggregate, Countable {
 	 * @return ExtendedPromiseInterface
 	 */
 	function post($body = null, $args = null, array $headers = null) : ExtendedPromiseInterface {
-		return $this->__xfer("POST", $args, $body, $headers);
+		return $this->request("POST", $args, $body, $headers);
 	}
 
 	/**
@@ -395,7 +382,7 @@ class API implements IteratorAggregate, Countable {
 	 * @return ExtendedPromiseInterface
 	 */
 	function put($body = null, $args = null, array $headers = null) : ExtendedPromiseInterface {
-		return $this->__xfer("PUT", $args, $body, $headers);
+		return $this->request("PUT", $args, $body, $headers);
 	}
 
 	/**
@@ -407,64 +394,7 @@ class API implements IteratorAggregate, Countable {
 	 * @return ExtendedPromiseInterface
 	 */
 	function patch($body = null, $args = null, array $headers = null) : ExtendedPromiseInterface {
-		return $this->__xfer("PATCH", $args, $body, $headers);
-	}
-
-	/**
-	 * Accessor to any hypermedia links
-	 *
-	 * @return null|Links
-	 */
-	function links() {
-		return $this->__links;
-	}
-
-	/**
-	 * Perform a GET request against the link's "first" relation
-	 *
-	 * @return ExtendedPromiseInterface
-	 */
-	function first() : ExtendedPromiseInterface {
-		if ($this->links() && ($first = $this->links()->getFirst())) {
-			return $this->withUrl($first)->get();
-		}
-		return reject($this->links());
-	}
-
-	/**
-	 * Perform a GET request against the link's "prev" relation
-	 *
-	 * @return ExtendedPromiseInterface
-	 */
-	function prev() : ExtendedPromiseInterface {
-		if ($this->links() && ($prev = $this->links()->getPrev())) {
-			return $this->withUrl($prev)->get();
-		}
-		return reject($this->links());
-	}
-
-	/**
-	 * Perform a GET request against the link's "next" relation
-	 *
-	 * @return ExtendedPromiseInterface
-	 */
-	function next() : ExtendedPromiseInterface {
-		if ($this->links() && ($next = $this->links()->getNext())) {
-			return $this->withUrl($next)->get();
-		}
-		return reject($this->links());
-	}
-
-	/**
-	 * Perform a GET request against the link's "last" relation
-	 *
-	 * @return ExtendedPromiseInterface
-	 */
-	function last() : ExtendedPromiseInterface {
-		if ($this->links() && ($last = $this->links()->getLast())) {
-			return $this->withUrl($last)->get();
-		}
-		return reject($this->links());
+		return $this->request("PATCH", $args, $body, $headers);
 	}
 
 	/**
@@ -473,43 +403,12 @@ class API implements IteratorAggregate, Countable {
 	 * @return API self
 	 */
 	function send() : API {
-		$this->__log->debug(__FUNCTION__.": start loop");
-		while (count($this->__client)) {
-			$this->__client->send();
+		$this->logger->debug(__FUNCTION__.": start loop");
+		while (count($this->client)) {
+			$this->client->send();
 		}
-		$this->__log->debug(__FUNCTION__.": end loop");
+		$this->logger->debug(__FUNCTION__.": end loop");
 		return $this;
-	}
-
-	/**
-	 * Run the send loop through a generator
-	 *
-	 * @param callable|Generator $cbg A \Generator or a factory of a \Generator yielding promises
-	 * @return ExtendedPromiseInterface The promise of the generator's return value
-	 * @throws InvalidArgumentException
-	 */
-	function __invoke($cbg) : ExtendedPromiseInterface {
-		$this->__log->debug(__FUNCTION__);
-
-		$invoker = new Invoker($this->__client);
-
-		if ($cbg instanceof Generator) {
-			return $invoker->iterate($cbg)->promise();
-		}
-
-		if (is_callable($cbg)) {
-			return $invoker->invoke(function() use($cbg) {
-				return $cbg($this);
-			})->promise();
-		}
-
-		throw InvalidArgumentException(
-			"Expected callable or Generator, got ".(
-				is_object($cbg)
-					? "instance of ".get_class($cbg)
-					: gettype($cbg).": ".var_export($cbg, true)
-			)
-		);
 	}
 
 	/**
@@ -520,27 +419,27 @@ class API implements IteratorAggregate, Countable {
 	 * @return bool
 	 */
 	function exists($seg, &$val = null) : bool {
-		if (is_array($this->__data) && array_key_exists($seg, $this->__data)) {
-			$val = $this->__data[$seg];
+		if (is_array($this->data) && array_key_exists($seg, $this->data)) {
+			$val = $this->data[$seg];
 			$exists = true;
-		} elseif (is_object($this->__data) && property_exists($this->__data, $seg)) {
-			$val = $this->__data->$seg;
+		} elseif (is_object($this->data) && property_exists($this->data, $seg)) {
+			$val = $this->data->$seg;
 			$exists = true;
 		} else {
 			$val = null;
 			$exists = false;
 		}
 
-		$this->__log->debug(__FUNCTION__."($seg) in ".(
-			is_object($this->__data)
-				? get_class($this->__data)
-				: gettype($this->__data)
+		$this->logger->debug(__FUNCTION__."($seg) in ".(
+			is_object($this->data)
+				? get_class($this->data)
+				: gettype($this->data)
 		)." -> ".(
 			$exists
 				? "true"
 				: "false"
 		), [
-			"url" => (string) $this->__url,
+			"url" => (string) $this->url,
 			"val" => $val,
 		]);
 
@@ -554,34 +453,37 @@ class API implements IteratorAggregate, Countable {
 	 * @param mixed $args The HTTP query string parameters
 	 * @param mixed $body Thee HTTP message's body
 	 * @param array $headers The request's additional HTTP headers
+	 * @param Call\Cache\Service $cache
 	 * @return ExtendedPromiseInterface
 	 */
-	private function __xfer(string $method, $args = null, $body = null, array $headers = null) : ExtendedPromiseInterface {
-		if (isset($this->__data)) {
-			$this->__log->debug(__FUNCTION__."($method) -> resolve", [
-				"url" => (string) $this->__url,
-				"args" => $args,
-				"body" => $body,
+	private function request(string $method, $args = null, $body = null, array $headers = null, Call\Cache\Service $cache = null) : ExtendedPromiseInterface {
+		if (isset($this->data)) {
+			$this->logger->debug("request -> resolve", [
+				"method"  => $method,
+				"url"     => (string)$this->url,
+				"args"    => $args,
+				"body"    => $body,
 				"headers" => $headers,
 			]);
 
 			return resolve($this);
 		}
 
-		$url = $this->__url->mod(["query" => new QueryString($args)]);
-		$request = new Request($method, $url, ((array) $headers) + $this->__headers,
+		$url = $this->url->mod(["query" => new QueryString($args)]);
+		$request = new Request($method, $url, ((array) $headers) + $this->headers,
 			 $body = is_array($body) ? json_encode($body) : (
 				is_resource($body) ? new Body($body) : (
 					is_scalar($body) ? (new Body)->append($body) :
 						$body)));
 
-		$this->__log->info(__FUNCTION__."($method) -> request", [
-			"url" => (string) $this->__url,
-			"args" => $this->__url->query,
+		$this->logger->info("request -> deferred", [
+			"method" => $method,
+			"url" => (string) $this->url,
+			"args" => $this->url->query,
 			"body" => $body,
 			"headers" => $headers,
 		]);
 
-		return (new Call($this, $this->__client, $request))->promise();
+		return (new Call\Deferred($this, $request, $cache ?: $this->cache))->promise();
 	}
 }

@@ -8,14 +8,14 @@ use Peridot\Console\Application;
 use Peridot\Console\Environment;
 use Peridot\Core\Suite;
 use Peridot\Core\Test;
-use seekat\API;
-use Symfony\Component\Console\Input\InputInterface;
-use Symfony\Component\Console\Output\OutputInterface;
+use Peridot\Reporter\AbstractBaseReporter;
+use Peridot\Reporter\AnonymousReporter;
 use Peridot\Reporter\CodeCoverage\AbstractCodeCoverageReporter;
 use Peridot\Reporter\CodeCoverageReporters;
 use Peridot\Reporter\ReporterFactory;
-use Peridot\Reporter\AnonymousReporter;
-use Peridot\Reporter\AbstractBaseReporter;
+use seekat\API;
+use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Output\OutputInterface;
 
 return function(EventEmitter $emitter) {
 	(new CodeCoverageReporters($emitter))->register();
@@ -28,17 +28,22 @@ return function(EventEmitter $emitter) {
 
 				return new class($reporterFactory, $ar->getConfiguration(), $ar->getOutput(), $ar->getEventEmitter()) extends AbstractBaseReporter {
 					private $reporters = [];
+					private $factory;
 
 					function __construct(ReporterFactory $factory, Configuration $configuration, OutputInterface $output, EventEmitter $eventEmitter) {
-						fprintf(STDERR, "Creating reporters\n");
-						$this->reporters[] = $factory->create("spec");
-						$this->reporters[] = $factory->create("text-code-coverage");
+						$this->factory = $factory;
 						parent::__construct($configuration, $output, $eventEmitter);
 					}
 
 					function init() {
+						fprintf(STDERR, "Creating reporters\n");
+						$this->reporters[] = $this->factory->create("spec");
+						if (extension_loaded("xdebug")) {
+							$this->reporters[] = $this->factory->create("text-code-coverage");
+						}
 					}
-					function __2call($method, array $args) {
+
+					function X__call($method, array $args) {
 						fprintf(STDERR, "Calling %s\n", $method);
 						foreach ($this->reporters as $reporter) {
 							$output = $reporter->$method(...$args);
@@ -83,7 +88,7 @@ return function(EventEmitter $emitter) {
 	$emitter->on("suite.start", function(Suite $suite) use($log) {
 		$headers = [];
 		if (($token = getenv("GITHUB_TOKEN"))) {
-			$headers["Authentication"] = "token $token";
+			$headers["Authorization"] = "token $token";
 		} elseif (function_exists("posix_isatty") && defined("STDIN") && posix_isatty(STDIN)) {
 			fprintf(STDOUT, "GITHUB_TOKEN is not set in the environment, enter Y to continue without: ");
 			fflush(STDOUT);

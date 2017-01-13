@@ -2,13 +2,12 @@
 
 namespace seekat\API;
 
-use http\{
-	Header,
-	Message\Body
+use seekat\{
+	API, Exception\InvalidArgumentException, Exception\UnexpectedValueException
 };
-
-use InvalidArgumentException;
-use UnexpectedValueException;
+use http\{
+	Header, Message\Body
+};
 
 class ContentType
 {
@@ -31,6 +30,7 @@ class ContentType
 		"diff"		=> "self::fromData",
 		"patch"		=> "self::fromData",
 		"text/plain"=> "self::fromData",
+		"application/octet-stream" => "self::fromStream",
 	];
 
 	/**
@@ -79,6 +79,31 @@ class ContentType
 	}
 
 	/**
+	 * @param API $api
+	 * @param string $type
+	 * @return API
+	 */
+	static function apply(API $api, string $type) : API {
+		$part = "[^()<>@,;:\\\"\/\[\]?.=[:space:][:cntrl:]]+";
+		if (preg_match("/^$part\/$part\$/", $type)) {
+			$that = $api->withHeader("Accept", $type);
+		} else {
+			switch (substr($type, 0, 1)) {
+				case "+":
+				case ".":
+				case "":
+					break;
+				default:
+					$type = ".$type";
+					break;
+			}
+			$vapi = static::version();
+			$that = $api->withHeader("Accept", "application/vnd.github.v$vapi$type");
+		}
+		return $that;
+	}
+
+	/**
 	 * @param Body $json
 	 * @return mixed
 	 * @throws UnexpectedValueException
@@ -102,6 +127,15 @@ class ContentType
 			throw new UnexpectedValueException("Could not decode BASE64");
 		}
 		return $decoded;
+	}
+
+
+	/**
+	 * @param Body $stream
+	 * @return resource stream
+	 */
+	private static function fromStream(Body $stream) {
+		return $stream->getResource();
 	}
 
 	/**

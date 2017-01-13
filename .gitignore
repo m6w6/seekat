@@ -1,1 +1,13 @@
-
+*~
+/.buildpath
+/.externalToolBuilders/
+/.idea/
+/.project
+/.settings/
+/clover.xml
+/code-coverage-report/
+/composer.lock
+/nbproject/
+/perf*
+/tmp/
+/vendor/

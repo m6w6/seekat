@@ -9,6 +9,7 @@ $cli = new http\Client("curl", "seekat");
 $cli->configure([
 	"max_host_connections" => 10,
 	"max_total_connections" => 50,
+	"use_eventloop" => false,
 ]);
 
 $log = new Monolog\Logger("seekat");
@@ -24,7 +25,7 @@ $api(function() use($api) {
 		"affiliation" => "owner"
 	]);
 	while ($repos) {
-		$next = $repos->next();
+		$next = next($repos);
 
 		$batch = [];
 		foreach ($repos as $repo) {

@@ -9,6 +9,9 @@ use http\ {
 };
 use seekat\Exception;
 
+/**
+ * @code-coverage-ignore
+ */
 class RequestException extends BaseException implements Exception
 {
 	/**

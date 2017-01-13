@@ -4,12 +4,14 @@
 require __DIR__."/../vendor/autoload.php";
 
 $api = new seekat\API([
-	"Authentication" => "token ".getenv("GUTHUB_TOKEN")
+	"Authorization" => "token ".getenv("GITHUB_TOKEN")
 ]);
 
 $api(function($api) {
 	$gists = yield $api->users->m6w6->gists();
 	while ($gists) {
+		$next = \seekat\API\Links\next($gists);
+
 		foreach ($gists as $gist) {
 			foreach ($gist->files as $name => $file) {
 				if ($name == "blog.md") {
@@ -25,6 +27,6 @@ $api(function($api) {
 			}
 		}
 
-		$gists = yield $gists->next();
+		$gists = yield $next;
 	}
 });

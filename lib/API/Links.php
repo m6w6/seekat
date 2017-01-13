@@ -2,6 +2,7 @@
 
 namespace seekat\API;
 
+use seekat\Exception\UnexpectedValueException;
 use http\ {
 	Header,
 	Params,
@@ -9,7 +10,6 @@ use http\ {
 	Url
 };
 use Serializable;
-use UnexpectedValueException;
 
 class Links implements Serializable
 {

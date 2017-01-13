@@ -4,6 +4,7 @@
 require_once __DIR__."/../vendor/autoload.php";
 
 use seekat\API;
+use seekat\API\Links;
 
 $log = new Monolog\Logger("seekat");
 $log->pushHandler((new Monolog\Handler\StreamHandler(STDERR))->setLevel(Monolog\Logger::INFO));
@@ -19,10 +20,10 @@ $api(function($api) {
 	$events = yield $api->repos->m6w6->{"ext-http"}->issues->events();
 	while ($events) {
 		/* pro-actively queue the next request */
-		$next = $events->next();
+		$next = Links\next($events);
 
 		foreach ($events as $event) {
-			if ($event->event == "labeled") {
+			if ($event->event == "labeled" || $event->event == "unlabeled") {
 				continue;
 			}
 			++$count;
