@@ -30,6 +30,7 @@ Full example:
 require_once __DIR__."/../vendor/autoload.php";
 
 use seekat\API;
+use function seekat\API\Links\next;
 
 $cli = new http\Client("curl", "seekat");
 $cli->configure([
@@ -38,7 +39,7 @@ $cli->configure([
 ]);
 
 $log = new Monolog\Logger("seekat");
-$log->pushHandler((new Monolog\Handler\StreamHandler(STDERR))->setLevel(Monolog\Logger::WARNING));
+$log->pushHandler(new Monolog\Handler\StreamHandler(STDERR, Monolog\Logger::WARNING));
 
 $api = new API([
 	"Authorization" => "token ".getenv("GITHUB_TOKEN")
@@ -50,7 +51,7 @@ $api(function($api) {
 		"affiliation" => "owner"
 	]);
 	while ($repos) {
-		$next = $repos->next();
+		$next = next($repos);
 
 		$batch = [];
 		foreach ($repos as $repo) {
