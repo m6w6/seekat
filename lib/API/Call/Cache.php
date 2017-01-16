@@ -9,7 +9,7 @@ use seekat\API\Call\Cache\Service;
 use seekat\API\Call\Cache\Service\Hollow;
 
 
-class Cache
+final class Cache
 {
 	/**
 	 * @var Service

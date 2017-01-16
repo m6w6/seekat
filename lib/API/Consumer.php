@@ -11,7 +11,7 @@ use React\Promise\{
 	function all
 };
 
-class Consumer extends Deferred
+final class Consumer extends Deferred
 {
 	/**
 	 * The HTTP client

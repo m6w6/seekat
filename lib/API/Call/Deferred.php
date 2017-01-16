@@ -6,12 +6,11 @@ use Exception;
 use http\{
 	Client, Client\Request, Client\Response
 };
-use React\Promise\ExtendedPromiseInterface;
 use seekat\API;
 use SplObserver;
 use SplSubject;
 
-class Deferred extends \React\Promise\Deferred implements SplObserver
+final class Deferred extends \React\Promise\Deferred implements SplObserver
 {
 	/**
 	 * The response importer

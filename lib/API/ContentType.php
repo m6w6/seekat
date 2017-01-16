@@ -9,7 +9,7 @@ use http\{
 	Header, Message\Body
 };
 
-class ContentType
+final class ContentType
 {
 	/**
 	 * API version

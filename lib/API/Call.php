@@ -7,7 +7,7 @@ use React\Promise\ExtendedPromiseInterface;
 use seekat\API;
 use seekat\Exception;
 
-class Call
+final class Call
 {
 	/**
 	 * @var API
@@ -29,7 +29,7 @@ class Call
 
 		/* fetch resource, unless already localized, and try for {$method}_url */
 		if (!$this->api->exists($this->call)) {
-			$promise = $promise->otherwise(function ($error) use($args) {
+			$promise = $promise->otherwise(function($error) use($args) {
 				if ($this->api->exists($this->call."_url", $url)) {
 					$url = new Url(uri_template($url, (array)current($args)));
 					return $this->api->withUrl($url)->get(...$args);

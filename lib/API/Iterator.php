@@ -6,7 +6,7 @@ use http\Url;
 use Iterator as BaseIterator;
 use seekat\API;
 
-class Iterator implements BaseIterator
+final class Iterator implements BaseIterator
 {
 	/**
 	 * The endpoint

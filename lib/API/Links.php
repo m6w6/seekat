@@ -11,7 +11,7 @@ use http\ {
 };
 use Serializable;
 
-class Links implements Serializable
+final class Links implements Serializable
 {
 	/**
 	 * Parsed "Link" relations
