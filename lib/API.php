@@ -102,7 +102,7 @@ class API implements IteratorAggregate, Countable {
 			$this->exists($seg, $that->data);
 		}
 
-		$this->logger->debug(__FUNCTION__."($seg)", [
+		$this->logger->debug("get($seg)", [
 			"url" => [
 				(string) $this->url,
 				(string) $that->url
@@ -164,12 +164,8 @@ class API implements IteratorAggregate, Countable {
 			goto invoke;
 		}
 
-		throw InvalidArgumentException(
-			"Expected callable or Generator, got ".(
-			is_object($cbg)
-				? "instance of ".get_class($cbg)
-				: gettype($cbg).": ".var_export($cbg, true)
-			)
+		throw new InvalidArgumentException(
+			"Expected callable or Generator, got ".typeof($cbg, true)
 		);
 	}
 
@@ -403,11 +399,11 @@ class API implements IteratorAggregate, Countable {
 	 * @return API self
 	 */
 	function send() : API {
-		$this->logger->debug(__FUNCTION__.": start loop");
+		$this->logger->debug("send: start loop");
 		while (count($this->client)) {
 			$this->client->send();
 		}
-		$this->logger->debug(__FUNCTION__.": end loop");
+		$this->logger->debug("send: end loop");
 		return $this;
 	}
 
@@ -430,14 +426,8 @@ class API implements IteratorAggregate, Countable {
 			$exists = false;
 		}
 
-		$this->logger->debug(__FUNCTION__."($seg) in ".(
-			is_object($this->data)
-				? get_class($this->data)
-				: gettype($this->data)
-		)." -> ".(
-			$exists
-				? "true"
-				: "false"
+		$this->logger->debug(sprintf("exists(%s) in %s -> %s",
+			$seg, typeof($this->data, false), $exists ? "true" : "false"
 		), [
 			"url" => (string) $this->url,
 			"val" => $val,
