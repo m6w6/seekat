@@ -7,7 +7,7 @@ use http\Header;
 use seekat\API;
 use seekat\Exception\RequestException;
 
-class Result
+final class Result
 {
 	private $api;
 
@@ -16,51 +16,66 @@ class Result
 	}
 
 	function __invoke(Response $response) : API {
-		$url = $this->api->getUrl();
-		$log = $this->api->getLogger();
-		$log->info(($response->getHeader("X-Cache-Time") ? "cached" : "enqueued")." -> response", [
-			"url" => (string) $url,
+		$hit = $response->getHeader("X-Cache-Time") ? "cached" : "enqueued";
+		$this->api->getLogger()->info("$hit -> response", [
+			"url"  => (string) $this->api->getUrl(),
 			"info" => $response->getInfo(),
 		]);
 
+		$links = $this->checkResponseMeta($response);
+		$type = $this->checkResponseType($response);
+
+		try {
+			$data = $type->parseBody($response->getBody());
+		} catch (\Exception $e) {
+			$this->api->getLogger()->error("response -> error: ".$e->getMessage(), [
+				"url" => (string) $this->api->getUrl(),
+			]);
+
+			throw $e;
+		}
+
+		$this->api = $this->api->with(compact("type", "data", "links"));
+
+		return $this->api;
+	}
+
+	/**
+	 * @param Response $response
+	 * @return null|API\Links
+	 * @throws RequestException
+	 */
+	private function checkResponseMeta(Response $response) {
 		if ($response->getResponseCode() >= 400) {
 			$e = new RequestException($response);
 
-			$log->critical(__FUNCTION__.": ".$e->getMessage(), [
-				"url" => (string) $url,
+			$this->api->getLogger()->critical("response -> error: ".$e->getMessage(), [
+				"url" => (string) $this->api->getUrl(),
 			]);
 
 			throw $e;
 		}
 
+		if (($link = $response->getHeader("Link", Header::class))) {
+			$links = new API\Links($link);
+		} else {
+			$links = null;
+		}
+
+		return $links;
+	}
+
+	private function checkResponseType(Response $response) {
 		if (!($type = $response->getHeader("Content-Type", Header::class))) {
 			$e = new RequestException($response);
-			$log->error(
-				__FUNCTION__.": Empty Content-Type -> ".$e->getMessage(), [
-				"url" => (string) $url,
-			]);
-			throw $e;
-		}
 
-		try {
-			$type = new API\ContentType($type);
-			$data = $type->parseBody($response->getBody());
-
-			if (($link = $response->getHeader("Link", Header::class))) {
-				$links = new API\Links($link);
-			} else {
-				$links = null;
-			}
-
-			$this->api = $this->api->with(compact("type", "data", "links"));
-		} catch (\Exception $e) {
-			$log->error(__FUNCTION__.": ".$e->getMessage(), [
-				"url" => (string) $url
+			$this->api->getLogger()->error("response -> error: Empty Content-Type -> ".$e->getMessage(), [
+				"url" => (string) $this->api->getUrl(),
 			]);
 
 			throw $e;
 		}
 
-		return $this->api;
+		return new API\ContentType($type);
 	}
 }
