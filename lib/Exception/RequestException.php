@@ -2,7 +2,6 @@
 
 namespace seekat\Exception;
 
-use Exception as BaseException;
 use http\ {
 	Client\Response,
 	Header
@@ -12,7 +11,7 @@ use seekat\Exception;
 /**
  * @code-coverage-ignore
  */
-class RequestException extends BaseException implements Exception
+class RequestException extends \Exception implements Exception
 {
 	/**
 	 * JSON errors

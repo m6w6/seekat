@@ -31,11 +31,13 @@ final class Links implements Serializable
 	 * @param Header $links The Link header
 	 * @throws UnexpectedValueException
 	 */
-	function __construct(Header $links) {
-		if (strcasecmp($links->name, "Link")) {
-			throw new UnexpectedValueException("Expected 'Link' header, got: '{$links->name}'");
+	function __construct(Header $links = null) {
+		if ($links) {
+			if (strcasecmp($links->name, "Link")) {
+				throw new UnexpectedValueException("Expected 'Link' header, got: '{$links->name}'");
+			}
+			$this->unserialize($links->value);
 		}
-		$this->unserialize($links->value);
 	}
 
 	/**

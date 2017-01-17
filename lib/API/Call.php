@@ -2,8 +2,8 @@
 
 namespace seekat\API;
 
+use AsyncInterop\Promise;
 use http\Url;
-use React\Promise\ExtendedPromiseInterface;
 use seekat\API;
 use seekat\Exception;
 
@@ -24,12 +24,15 @@ final class Call
 		$this->call = $call;
 	}
 
-	function __invoke(array $args) : ExtendedPromiseInterface {
+	function __invoke(array $args) : Promise {
 		$promise = $this->api->{$this->call}->get(...$args);
 
 		/* fetch resource, unless already localized, and try for {$method}_url */
 		if (!$this->api->exists($this->call)) {
-			$promise = $promise->otherwise(function($error) use($args) {
+			$promise->when(function($error, $value) use($args) {
+				if (!isset($error)) {
+					return $value;
+				}
 				if ($this->api->exists($this->call."_url", $url)) {
 					$url = new Url(uri_template($url, (array)current($args)));
 					return $this->api->withUrl($url)->get(...$args);

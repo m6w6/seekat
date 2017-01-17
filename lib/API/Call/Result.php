@@ -35,9 +35,7 @@ final class Result
 			throw $e;
 		}
 
-		$this->api = $this->api->with(compact("type", "data", "links"));
-
-		return $this->api;
+		return $this->api = $this->api->with(compact("type", "data", "links"));
 	}
 
 	/**
@@ -56,13 +54,11 @@ final class Result
 			throw $e;
 		}
 
-		if (($link = $response->getHeader("Link", Header::class))) {
-			$links = new API\Links($link);
-		} else {
-			$links = null;
+		if (!($link = $response->getHeader("Link", Header::class))) {
+			$link = null;
 		}
 
-		return $links;
+		return new API\Links($link);
 	}
 
 	private function checkResponseType(Response $response) {

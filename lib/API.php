@@ -2,6 +2,7 @@
 
 namespace seekat;
 
+use AsyncInterop\Promise;
 use Countable;
 use Generator;
 use http\{
@@ -11,12 +12,10 @@ use IteratorAggregate;
 use Psr\Log\{
 	LoggerInterface, NullLogger
 };
-use React\Promise\{
-	ExtendedPromiseInterface, function resolve
+use seekat\API\{
+	Call, Consumer, ContentType, Future, Iterator, Links
 };
-use seekat\{
-	API\Call, API\Consumer, API\ContentType, API\Iterator, API\Links, Exception\InvalidArgumentException
-};
+use seekat\Exception\InvalidArgumentException;
 
 class API implements IteratorAggregate, Countable {
 	/**
@@ -36,6 +35,12 @@ class API implements IteratorAggregate, Countable {
 	 * @var Call\Cache\Service
 	 */
 	private $cache;
+
+	/**
+	 * Promisor
+	 * @var Future
+	 */
+	private $future;
 
 	/**
 	 * The HTTP client
@@ -70,12 +75,15 @@ class API implements IteratorAggregate, Countable {
 	/**
 	 * Create a new API endpoint root
 	 *
+	 * @param Future $future pretending to fulfill promises
 	 * @param array $headers Standard request headers, defaults to ["Accept" => "application/vnd.github.v3+json"]
 	 * @param Url $url The API's endpoint, defaults to https://api.github.com
 	 * @param Client $client The HTTP client to use for executing requests
 	 * @param LoggerInterface $log A logger
+	 * @param Call\Cache\Service $cache A cache
 	 */
-	function __construct(array $headers = null, Url $url = null, Client $client = null, LoggerInterface $log = null, Call\Cache\Service $cache = null) {
+	function __construct(Future $future, array $headers = null, Url $url = null, Client $client = null, LoggerInterface $log = null, Call\Cache\Service $cache = null) {
+		$this->future = $future;
 		$this->cache = $cache;
 		$this->logger = $log ?? new NullLogger;
 		$this->url = $url ?? new Url("https://api.github.com");
@@ -117,26 +125,31 @@ class API implements IteratorAggregate, Countable {
 	 *
 	 * @param string $method The API's "path" element to ascend into
 	 * @param array $args Array of arguments forwarded to \seekat\API::get()
-	 * @return ExtendedPromiseInterface
+	 * @return Promise
 	 */
-	function __call(string $method, array $args) : ExtendedPromiseInterface {
+	function __call(string $method, array $args) : Promise {
 		/* We cannot implement an explicit then() method,
 		 * because the Promise implementation might think
 		 * we're actually implementing Thenable,
 		 * which might cause an infinite loop.
+		 * FIXXME: then/when
 		 */
-		if ($method === "then") {
-			return $this->get()->then(...$args);
+		if ($method === "when") {
+			$promise = $this->get();
+			$promise->when(...$args);
+			return $promise;
 		}
 
 		/*
 		 * very short-hand version:
-		 * ->users->m6w6->gists->get()->then(...)
+		 * ->users->m6w6->gists->get()->when(...)
 		 * vs:
 		 * ->users->m6w6->gists(...)
 		 */
 		if (is_callable(current($args))) {
-			return $this->api->get()->then(current($args));
+			$promise = $this->get();
+			$promise->when(current($args));
+			return $promise;
 		}
 
 		return (new Call($this, $method))($args);
@@ -146,10 +159,10 @@ class API implements IteratorAggregate, Countable {
 	 * Run the send loop through a generator
 	 *
 	 * @param callable|Generator $cbg A \Generator or a factory of a \Generator yielding promises
-	 * @return ExtendedPromiseInterface The promise of the generator's return value
+	 * @return Promise The promise of the generator's return value
 	 * @throws InvalidArgumentException
 	 */
-	function __invoke($cbg) : ExtendedPromiseInterface {
+	function __invoke($cbg) : Promise {
 		$this->logger->debug(__FUNCTION__);
 
 		$consumer = new Consumer($this->client);
@@ -220,6 +233,13 @@ class API implements IteratorAggregate, Countable {
 	 */
 	function getLogger() : LoggerInterface {
 		return $this->logger;
+	}
+
+	/**
+	 * @return Future
+	 */
+	function getFuture() {
+		return $this->future;
 	}
 
 	/**
@@ -340,9 +360,9 @@ class API implements IteratorAggregate, Countable {
 	 *
 	 * @param mixed $args The HTTP query string parameters
 	 * @param array $headers The request's additional HTTP headers
-	 * @return ExtendedPromiseInterface
+	 * @return Promise
 	 */
-	function get($args = null, array $headers = null, $cache = null) : ExtendedPromiseInterface {
+	function get($args = null, array $headers = null, $cache = null) : Promise {
 		return $this->request("GET", $args, null, $headers, $cache);
 	}
 
@@ -351,9 +371,9 @@ class API implements IteratorAggregate, Countable {
 	 *
 	 * @param mixed $args The HTTP query string parameters
 	 * @param array $headers The request's additional HTTP headers
-	 * @return ExtendedPromiseInterface
+	 * @return Promise
 	 */
-	function delete($args = null, array $headers = null) : ExtendedPromiseInterface {
+	function delete($args = null, array $headers = null) : Promise {
 		return $this->request("DELETE", $args, null, $headers);
 	}
 
@@ -363,9 +383,9 @@ class API implements IteratorAggregate, Countable {
 	 * @param mixed $body The HTTP message's body
 	 * @param mixed $args The HTTP query string parameters
 	 * @param array $headers The request's additional HTTP headers
-	 * @return ExtendedPromiseInterface
+	 * @return Promise
 	 */
-	function post($body = null, $args = null, array $headers = null) : ExtendedPromiseInterface {
+	function post($body = null, $args = null, array $headers = null) : Promise {
 		return $this->request("POST", $args, $body, $headers);
 	}
 
@@ -375,9 +395,9 @@ class API implements IteratorAggregate, Countable {
 	 * @param mixed $body The HTTP message's body
 	 * @param mixed $args The HTTP query string parameters
 	 * @param array $headers The request's additional HTTP headers
-	 * @return ExtendedPromiseInterface
+	 * @return Promise
 	 */
-	function put($body = null, $args = null, array $headers = null) : ExtendedPromiseInterface {
+	function put($body = null, $args = null, array $headers = null) : Promise {
 		return $this->request("PUT", $args, $body, $headers);
 	}
 
@@ -387,9 +407,9 @@ class API implements IteratorAggregate, Countable {
 	 * @param mixed $body The HTTP message's body
 	 * @param mixed $args The HTTP query string parameters
 	 * @param array $headers The request's additional HTTP headers
-	 * @return ExtendedPromiseInterface
+	 * @return Promise
 	 */
-	function patch($body = null, $args = null, array $headers = null) : ExtendedPromiseInterface {
+	function patch($body = null, $args = null, array $headers = null) : Promise {
 		return $this->request("PATCH", $args, $body, $headers);
 	}
 
@@ -444,19 +464,19 @@ class API implements IteratorAggregate, Countable {
 	 * @param mixed $body Thee HTTP message's body
 	 * @param array $headers The request's additional HTTP headers
 	 * @param Call\Cache\Service $cache
-	 * @return ExtendedPromiseInterface
+	 * @return Promise
 	 */
-	private function request(string $method, $args = null, $body = null, array $headers = null, Call\Cache\Service $cache = null) : ExtendedPromiseInterface {
+	private function request(string $method, $args = null, $body = null, array $headers = null, Call\Cache\Service $cache = null) : Promise {
 		if (isset($this->data)) {
 			$this->logger->debug("request -> resolve", [
 				"method"  => $method,
-				"url"     => (string)$this->url,
+				"url"     => (string) $this->url,
 				"args"    => $args,
 				"body"    => $body,
 				"headers" => $headers,
 			]);
 
-			return resolve($this);
+			return Future\resolve($this->future, $this);
 		}
 
 		$url = $this->url->mod(["query" => new QueryString($args)]);
@@ -474,6 +494,6 @@ class API implements IteratorAggregate, Countable {
 			"headers" => $headers,
 		]);
 
-		return (new Call\Deferred($this, $request, $cache ?: $this->cache))->promise();
+		return (new Call\Deferred($this, $request, $cache ?: $this->cache))();
 	}
 }

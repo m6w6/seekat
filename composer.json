@@ -14,19 +14,27 @@
             "seekat\\": "lib/"
         },
         "files": [
-            "lib/functions.php"
+            "lib/functions.php",
+            "lib/Exception/functions.php",
+            "lib/API/Future/functions.php",
+            "lib/API/Links/functions.php"
         ]
     },
+    "minimum-stability": "beta",
+    "prefer-stable": true,
     "require": {
         "php": "^7.0",
         "ext-http": "^3.0",
-        "react/promise": "^2.4",
         "seebz/uri-template": "dev-master",
 		"psr/log": "^1.0",
         "psr/cache": "^1.0",
-        "psr/simple-cache": "^1.0"
+        "psr/simple-cache": "^1.0",
+        "async-interop/promise": "^0.4.0"
     },
     "require-dev": {
+        "react/promise": "dev-async-interop",
+        "amphp/amp": "dev-master",
+        "amphp/loop": "dev-master",
         "peridot-php/peridot": "^1.15",
         "monolog/monolog": "^1.19",
         "peridot-php/leo": "^1.5",
