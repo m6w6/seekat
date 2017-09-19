@@ -17,7 +17,7 @@ function first(API $api, Cache\Service $cache = null) : Promise {
 	if ($links && ($first = $links->getFirst())) {
 		return $api->withUrl($first)->get(null, null, $cache);
 	}
-	return Future\reject($api->getFuture(), $links);
+	return Future\resolve($api->getFuture(), null);
 }
 
 /**
@@ -30,7 +30,7 @@ function prev(API $api, Cache\Service $cache = null) : Promise {
 	if ($links && ($prev = $links->getPrev())) {
 		return $api->withUrl($prev)->get(null, null, $cache);
 	}
-	return Future\reject($api->getFuture(), $links);
+	return Future\resolve($api->getFuture(), null);
 }
 
 /**
@@ -43,7 +43,7 @@ function next(API $api, Cache\Service $cache = null) : Promise {
 	if ($links && ($next = $links->getNext())) {
 		return $api->withUrl($next)->get(null, null, $cache);
 	}
-	return Future\reject($api->getFuture(), $links);
+	return Future\resolve($api->getFuture(), null);
 }
 
 /**
@@ -56,6 +56,6 @@ function last(API $api, Cache\Service $cache = null) : Promise {
 	if ($links && ($last = $links->getLast())) {
 		return $api->withUrl($last)->get(null, null, $cache);
 	}
-	return Future\reject($api->getFuture(), $links);
+	return Future\resolve($api->getFuture(), null);
 }
 

@@ -25,6 +25,30 @@ class API implements IteratorAggregate, Countable {
 	private $url;
 
 	/**
+	 * Default headers to send out to the API endpoint
+	 * @var array
+	 */
+	private $headers;
+
+	/**
+	 * Current endpoints links
+	 * @var Links
+	 */
+	private $links;
+
+	/**
+	 * Current endpoint data's Content-Type
+	 * @var API\ContentType
+	 */
+	private $type;
+
+	/**
+	 * Current endpoint's data
+	 * @var array|object
+	 */
+	private $data;
+
+	/**
 	 * Logger
 	 * @var LoggerInterface
 	 */
@@ -47,30 +71,6 @@ class API implements IteratorAggregate, Countable {
 	 * @var Client
 	 */
 	private $client;
-
-	/**
-	 * Default headers to send out to the API endpoint
-	 * @var array
-	 */
-	private $headers;
-
-	/**
-	 * Current endpoint data's Content-Type
-	 * @var API\ContentType
-	 */
-	private $type;
-
-	/**
-	 * Current endpoint's data
-	 * @var array|object
-	 */
-	private $data;
-
-	/**
-	 * Current endpoints links
-	 * @var Links
-	 */
-	private $links;
 
 	/**
 	 * Create a new API endpoint root
@@ -165,7 +165,9 @@ class API implements IteratorAggregate, Countable {
 	function __invoke($cbg) : Promise {
 		$this->logger->debug(__FUNCTION__);
 
-		$consumer = new Consumer($this->client);
+		$consumer = new Consumer($this->getFuture(), function() {
+			$this->client->send();
+		});
 
 		invoke:
 		if ($cbg instanceof Generator) {
@@ -273,7 +275,7 @@ class API implements IteratorAggregate, Countable {
 	function export() : array {
 		$data = $this->data;
 		$url = clone $this->url;
-		$type = clone $this->type;
+		$type = $this->type ? clone $this->type : null;
 		$links = $this->links ? clone $this->links : null;
 		$headers = $this->headers;
 		return compact("url", "data", "type", "links", "headers");
@@ -353,6 +355,17 @@ class API implements IteratorAggregate, Countable {
 			$that->data = null;
 		}
 		return $that;
+	}
+
+	/**
+	 * Perform a HEAD request against the endpoint's underlying URL
+	 *
+	 * @param mixed $args The HTTP query string parameters
+	 * @param array $headers The request's additional HTTP headers
+	 * @return Promise
+	 */
+	function head($args = null, array $headers = null, $cache = null) : Promise {
+		return $this->request("HEAD", $args, null, $headers, $cache);
 	}
 
 	/**

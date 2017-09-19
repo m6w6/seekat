@@ -11,13 +11,13 @@ $log->pushHandler((new Monolog\Handler\StreamHandler(STDERR))->setLevel(Monolog\
 
 $cli = new http\Client("curl", "seekat");
 
-$api = new API([
+$api = new API(API\Future\react(), [
 	"Authorization" => "token ".getenv("GITHUB_TOKEN")
 ], null, $cli, $log);
 
 $api(function($api) {
 	$count = 0;
-	$events = yield $api->repos->m6w6->{"ext-http"}->issues->events();
+	$events = yield $api->repos->m6w6->{"ext-pq"}->issues->events();
 	while ($events) {
 		/* pro-actively queue the next request */
 		$next = Links\next($events);
@@ -38,7 +38,7 @@ $api(function($api) {
 		$events = yield $next;
 	}
 	return $count;
-})->done(function($count) {
+})->when(function($error, $count) {
 	printf("Listed %d events\n", $count);
 });
 

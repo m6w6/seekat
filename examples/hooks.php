@@ -3,21 +3,20 @@
 
 require_once __DIR__."/../vendor/autoload.php";
 
-use seekat\API;
+use seekat\{API, API\Future, API\Links};
+use Monolog\{Logger, Handler};
 
 $cli = new http\Client("curl", "seekat");
 $cli->configure([
 	"max_host_connections" => 10,
 	"max_total_connections" => 50,
-	"use_eventloop" => false,
+	"use_eventloop" => true,
 ]);
 
-$log = new Monolog\Logger("seekat");
-$log->pushHandler((new Monolog\Handler\StreamHandler(STDERR))->setLevel(Monolog\Logger::WARNING));
+$log = new Logger("seekat");
+$log->pushHandler(new Handler\StreamHandler(STDERR, Logger::NOTICE));
 
-$api = new API([
-	"Authorization" => "token ".getenv("GITHUB_TOKEN")
-], null, $cli, $log);
+$api = new API(Future\react(), API\auth("token", getenv("GITHUB_TOKEN")), null, $cli, $log);
 
 $api(function() use($api) {
 	$repos = yield $api->users->m6w6->repos([
@@ -25,7 +24,7 @@ $api(function() use($api) {
 		"affiliation" => "owner"
 	]);
 	while ($repos) {
-		$next = next($repos);
+		$next = Links\next($repos);
 
 		$batch = [];
 		foreach ($repos as $repo) {

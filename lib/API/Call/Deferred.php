@@ -3,16 +3,13 @@
 namespace seekat\API\Call;
 
 use AsyncInterop\Promise;
-use Exception;
 use http\{
 	Client, Client\Request, Client\Response
 };
 use Psr\Log\LoggerInterface;
 use seekat\API;
-use SplObserver;
-use SplSubject;
 
-final class Deferred implements SplObserver
+final class Deferred
 {
 	/**
 	 * The response importer
@@ -94,7 +91,6 @@ final class Deferred implements SplObserver
 				/* we did finish in the meantime */
 				$this->complete();
 			} else {
-				$this->client->detach($this);
 				$this->client->dequeue($this->request);
 				($this->reject)("Cancelled");
 			}
@@ -102,7 +98,6 @@ final class Deferred implements SplObserver
 		$this->promise = $future->getPromise($context);
 		$this->resolve = API\Future\resolver($future, $context);
 		$this->reject = API\Future\rejecter($future, $context);
-		$this->update = API\Future\updater($future, $context);
 	}
 
 	function __invoke() : Promise {
@@ -115,7 +110,6 @@ final class Deferred implements SplObserver
 			$this->response = $cached;
 			$this->complete();
 		} else {
-			$this->client->attach($this);
 			$this->client->enqueue($this->request, function(Response $response) use($cached) {
 				if ($response->getResponseCode() == 304) {
 					$this->response = $cached;
@@ -137,30 +131,9 @@ final class Deferred implements SplObserver
 	}
 
 	/**
-	 * Progress observer
-	 *
-	 * Import the response's data on success and resolve the promise.
-	 *
-	 * @param SplSubject $client The observed HTTP client
-	 * @param Request $request The request which generated the update
-	 * @param object $progress The progress information
-	 */
-	function update(SplSubject $client, Request $request = null, $progress = null) {
-		if ($request !== $this->request) {
-			return;
-		}
-
-		($this->update)((object) compact("client", "request", "progress"));
-	}
-
-	/**
 	 * Completion callback
-	 * @param callable $resolve
-	 * @param callable $reject
 	 */
 	private function complete() {
-		$this->client->detach($this);
-
 		if ($this->response) {
 			try {
 				$api = ($this->result)($this->response);
@@ -168,7 +141,7 @@ final class Deferred implements SplObserver
 				$this->cache->save($this->request, $this->response);
 
 				($this->resolve)($api);
-			} catch (Exception $e) {
+			} catch (\Throwable $e) {
 				($this->reject)($e);
 			}
 		} else {

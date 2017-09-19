@@ -4,7 +4,6 @@ namespace seekat\API\Future;
 
 use Amp\Deferred as AmpDeferred;
 use AsyncInterop\Promise;
-use Icicle\Awaitable\Deferred as IcicleDeferred;
 use React\Promise\Deferred as ReactDeferred;
 use seekat\API\Future;
 
@@ -57,9 +56,9 @@ function rejecter(Future $future, $context) {
  * @param mixed $context Promisor
  * @return \Closure
  */
-function updater(Future $future, $context) {
-	return function($update) use($future, $context) {
-		return $future->onUpdate($context, $update);
+function reducer(Future $future, $context) {
+	return function(array $promises) use($future, $context) : Promise {
+		return $future->onMultiple($context, $promises);
 	};
 }
 
@@ -81,6 +80,12 @@ function react() {
 			return $context->promise();
 		}
 
+		function cancelPromise(Promise $promise) : bool {
+			/* @var $promise \React\Promise\Promise */
+			$promise->cancel();
+			return true;
+		}
+
 		function onSuccess($context, $value) {
 			/* @var $context ReactDeferred */
 			$context->resolve($value);
@@ -91,9 +96,8 @@ function react() {
 			$context->reject($reason);
 		}
 
-		function onUpdate($context, $update) {
-			/* @var $context ReactDeferred */
-			$context->notify($update);
+		function onMultiple($context, array $promises) : Promise {
+			return \React\Promise\all($promises);
 		}
 	};
 }
@@ -115,6 +119,10 @@ function amp() {
 			return $context->promise();
 		}
 
+		function cancelPromise(Promise $promise) : bool {
+			return false;
+		}
+
 		function onSuccess($context, $value) {
 			/* @var $context AmpDeferred */
 			$context->resolve($value);
@@ -122,47 +130,11 @@ function amp() {
 
 		function onFailure($context, $reason) {
 			/* @var $context AmpDeferred */
-			$context->fail($reason);
+			$context->fail(\seekat\Exception\exception($reason));
 		}
 
-		function onUpdate($context, $update) {
-			/* @var $context AmpDeferred */
-			/* noop */
-		}
-	};
-}
-
-/**
- * @return Future
- */
-function icicle() {
-	return new class implements Future {
-		/**
-		 * @param callable|null $onCancel
-		 * @return IcicleDeferred
-		 */
-		function createContext(callable $onCancel = null) {
-			return new IcicleDeferred($onCancel);
-		}
-
-		function getPromise($context): Promise {
-			/* @var $context IcicleDeferred */
-			return $context->getPromise();
-		}
-
-		function onSuccess($context, $value) {
-			/* @var $context IcicleDeferred */
-			$context->resolve($value);
-		}
-
-		function onFailure($context, $reason) {
-			/* @var $context IcicleDeferred */
-			$context->reject($reason);
-		}
-
-		function onUpdate($context, $update) {
-			/* @var $context IcicleDeferred */
-			/* noop */
+		function onMultiple($context, array $promises) : Promise {
+			return \Amp\all($promises);
 		}
 	};
 }

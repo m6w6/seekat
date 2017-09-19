@@ -19,6 +19,12 @@ interface Future
 	function getPromise($context) : Promise;
 
 	/**
+	 * @param Promise $promise
+	 * @return bool
+	 */
+	function cancelPromise(Promise $promise) : bool;
+
+	/**
 	 * @param object $context Promisor returned by createContext
 	 * @param mixed $value
 	 * @return void
@@ -34,8 +40,8 @@ interface Future
 
 	/**
 	 * @param object $context Promisor returned by createContext
-	 * @param mixed $update
-	 * @return void
+	 * @param array $promises
+	 * @return Promise
 	 */
-	function onUpdate($context, $update);
+	function onMultiple($context, array $promises) : Promise;
 }

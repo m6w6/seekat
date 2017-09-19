@@ -15,12 +15,13 @@
         },
         "files": [
             "lib/functions.php",
-            "lib/Exception/functions.php",
+            "lib/API/functions.php",
             "lib/API/Future/functions.php",
-            "lib/API/Links/functions.php"
+            "lib/API/Links/functions.php",
+            "lib/Exception/functions.php"
         ]
     },
-    "minimum-stability": "beta",
+    "minimum-stability": "dev",
     "prefer-stable": true,
     "require": {
         "php": "^7.0",
@@ -35,9 +36,7 @@
         "react/promise": "dev-async-interop",
         "amphp/amp": "dev-master",
         "amphp/loop": "dev-master",
-        "peridot-php/peridot": "^1.15",
         "monolog/monolog": "^1.19",
-        "peridot-php/leo": "^1.5",
-        "peridot-php/peridot-code-coverage-reporters": "^2.0"
+        "phpunit/phpunit": "^5"
     }
 }

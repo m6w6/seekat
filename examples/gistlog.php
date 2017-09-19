@@ -3,9 +3,15 @@
 
 require __DIR__."/../vendor/autoload.php";
 
-$api = new seekat\API([
-	"Authorization" => "token ".getenv("GITHUB_TOKEN")
-]);
+
+$log = new Monolog\Logger("seekat");
+$log->pushHandler(new Monolog\Handler\StreamHandler(STDERR, Monolog\Logger::DEBUG));
+
+$api = new seekat\API(
+	seekat\API\Future\react(),
+	seekat\API\auth("token", getenv("GITHUB_TOKEN")),
+	null, null, $log
+);
 
 $api(function($api) {
 	$gists = yield $api->users->m6w6->gists();
@@ -15,7 +21,7 @@ $api(function($api) {
 		foreach ($gists as $gist) {
 			foreach ($gist->files as $name => $file) {
 				if ($name == "blog.md") {
-					$text = $file->as("raw")->raw();;
+					$text = $file->raw();
 					$head = $gist->description." ".$gist->created_at;
 					echo "$head\n";
 					echo str_repeat("=", strlen($head))."\n\n";

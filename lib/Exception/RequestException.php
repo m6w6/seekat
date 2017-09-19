@@ -61,6 +61,13 @@ class RequestException extends \Exception implements Exception
 	}
 
 	/**
+	 * @return Response
+	 */
+	function getResponse() : Response {
+		return $this->response;
+	}
+
+	/**
 	 * Combine any errors into a single string
 	 * @staticvar array $reasons
 	 * @return string

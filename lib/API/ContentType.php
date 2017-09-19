@@ -123,7 +123,7 @@ final class ContentType
 	 * @throws UnexpectedValueException
 	 */
 	private static function fromBase64(Body $base64) : string {
-		if (false === ($decoded = base64_decode($base64))) {
+		if (false === ($decoded = base64_decode($base64, true))) {
 			throw new UnexpectedValueException("Could not decode BASE64");
 		}
 		return $decoded;

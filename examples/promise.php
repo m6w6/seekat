@@ -4,16 +4,14 @@
 require_once __DIR__."/../vendor/autoload.php";
 
 use seekat\API;
-use seekat\API\Future;
 
-$log = new Monolog\Logger("seekat");
-$log->pushHandler((new Monolog\Handler\StreamHandler(STDERR))->setLevel(Monolog\Logger::NOTICE));
-
-$api = new API(Future\amp(), API\auth("token", getenv("GITHUB_TOKEN")), null, null, $log);
+$api = new API(API\Future\amp(), API\auth("token", getenv("GITHUB_TOKEN")));
 
 $api->users->m6w6->gists()->when(function($error, $gists) {
+	$error and die($error);
 	foreach ($gists as $gist) {
 		$gist->commits()->when(function($error, $commits) use($gist) {
+			$error and die($error);
 			foreach ($commits as $i => $commit) {
 				if (!$i) {
 					printf("\nGist %s, %s:\n", $gist->id, $gist->description ?: "<no title>");

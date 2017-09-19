@@ -24,16 +24,7 @@ final class Result
 
 		$links = $this->checkResponseMeta($response);
 		$type = $this->checkResponseType($response);
-
-		try {
-			$data = $type->parseBody($response->getBody());
-		} catch (\Exception $e) {
-			$this->api->getLogger()->error("response -> error: ".$e->getMessage(), [
-				"url" => (string) $this->api->getUrl(),
-			]);
-
-			throw $e;
-		}
+		$data = $this->checkResponseBody($response, $type);
 
 		return $this->api = $this->api->with(compact("type", "data", "links"));
 	}
@@ -73,5 +64,19 @@ final class Result
 		}
 
 		return new API\ContentType($type);
+	}
+
+	private function checkResponseBody(Response $response, API\ContentType $type) {
+		try {
+			$data = $type->parseBody($response->getBody());
+		} catch (\Exception $e) {
+			$this->api->getLogger()->error("response -> error: ".$e->getMessage(), [
+				"url" => (string) $this->api->getUrl(),
+			]);
+
+			throw $e;
+		}
+
+		return $data;
 	}
 }

@@ -1,72 +1,25 @@
 <?php
 
-use Evenement\EventEmitterInterface as EventEmitter;
 use Monolog\Handler\AbstractProcessingHandler;
 use Monolog\Logger;
+use Peridot\Cli\Environment;
+use Peridot\Cli\Application;
 use Peridot\Configuration;
-use Peridot\Console\Application;
-use Peridot\Console\Environment;
 use Peridot\Core\Suite;
 use Peridot\Core\Test;
-use Peridot\Reporter\AbstractBaseReporter;
-use Peridot\Reporter\AnonymousReporter;
-use Peridot\Reporter\CodeCoverage\AbstractCodeCoverageReporter;
-use Peridot\Reporter\CodeCoverageReporters;
-use Peridot\Reporter\ReporterFactory;
+use Peridot\Plugin\Scenarios;
 use seekat\API;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 
-return function(EventEmitter $emitter) {
-	(new CodeCoverageReporters($emitter))->register();
-
-	$emitter->on('peridot.reporters', function(InputInterface $input, ReporterFactory $reporterFactory) {
-        $reporterFactory->register(
-            'seekat',
-            'Spec + Text Code coverage reporter',
-            function(AnonymousReporter $ar) use ($reporterFactory) {
-
-				return new class($reporterFactory, $ar->getConfiguration(), $ar->getOutput(), $ar->getEventEmitter()) extends AbstractBaseReporter {
-					private $reporters = [];
-					private $factory;
-
-					function __construct(ReporterFactory $factory, Configuration $configuration, OutputInterface $output, EventEmitter $eventEmitter) {
-						$this->factory = $factory;
-						parent::__construct($configuration, $output, $eventEmitter);
-					}
-
-					function init() {
-						fprintf(STDERR, "Creating reporters\n");
-						$this->reporters[] = $this->factory->create("spec");
-						if (extension_loaded("xdebug")) {
-							$this->reporters[] = $this->factory->create("text-code-coverage");
-						}
-					}
-
-					function X__call($method, array $args) {
-						fprintf(STDERR, "Calling %s\n", $method);
-						foreach ($this->reporters as $reporter) {
-							$output = $reporter->$method(...$args);
-						}
-						return $output;
-					}
-				};
-			}
-        );
-	});
-
-	$emitter->on('code-coverage.start', function (AbstractCodeCoverageReporter $reporter) {
-        $reporter->addDirectoryToWhitelist(__DIR__."/lib")
-			->addDirectoryToWhitelist(__DIR__."/tests");
-	});
+return function(\Peridot\EventEmitterInterface $emitter) {
+	Scenarios\Plugin::register($emitter);
 
 	$emitter->on("peridot.start", function(Environment $env, Application $app) {
 		$app->setCatchExceptions(false);
 		$definition = $env->getDefinition();
 		$definition->getArgument("path")
 			->setDefault(implode(" ", glob("tests/*")));
-		$definition->getOption("reporter")
-			->setDefault("seekat");
 	});
 
 	$log = new class extends AbstractProcessingHandler {
@@ -85,7 +38,7 @@ return function(EventEmitter $emitter) {
 			}
 		}
 	};
-	$emitter->on("suite.start", function(Suite $suite) use($log) {
+	$emitter->on("suite.start", function(Suite $suite) use(&$headers, $log) {
 		$headers = [];
 		if (($token = getenv("GITHUB_TOKEN"))) {
 			$headers["Authorization"] = "token $token";
@@ -98,7 +51,10 @@ return function(EventEmitter $emitter) {
 		} else {
 			throw new Exception("GITHUB_TOKEN is not set in the environment");
 		}
-		$suite->getScope()->api = new API($headers, null, null, new Logger("seekat", [$log]));
+		$suite->getScope()->amp = new API(API\Future\amp(),
+			$headers, null, null, new Logger("amp", [$log]));
+		$suite->getScope()->react = new API(API\Future\react(),
+			$headers, null, null, new Logger("react", [$log]));
 	});
 
 	$emitter->on("test.failed", function(Test $test, \Throwable $e) {

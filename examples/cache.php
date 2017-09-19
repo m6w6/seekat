@@ -34,7 +34,7 @@ $cache = new class($redis) implements \seekat\API\Call\Cache\Service {
 	}
 };
 
-$api = new seekat\API([
+$api = new seekat\API(seekat\API\Future\react(), [
 	"Authorization" => "token ".getenv("GITHUB_TOKEN")
 ], null, null, $log, $cache);
 
