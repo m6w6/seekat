@@ -62,11 +62,27 @@ class BaseTest extends \PHPUnit\Framework\TestCase
 
 trait ConsumePromise
 {
-	function consumePromise(\AsyncInterop\Promise $p, &$errors, &$results) {
-		$p->when(function($error, $result) use(&$errors, &$results) {
-			if ($error) $errors[] = $error;
-			if ($result) $results[] = $result;
-		});
+	function consumePromise($p, &$errors, &$results) {
+		if (method_exists($p, "done")) {
+			$p->then(function($result) use(&$results) {
+				if (isset($result)) {
+					$results[] = $result;
+				}
+			}, function($error) use (&$errors) {
+				if (isset($error)) {
+					$errors[] = $error;
+				}
+			});
+		} else {
+			$p->onResolve(function($error, $result) use(&$errors, &$results) {
+				if (isset($error)) {
+					$errors[] = $error;
+				}
+				if (isset($result)) {
+					$results[] = $result;
+				}
+			});
+		}
 	}
 }
 
@@ -93,11 +109,11 @@ trait AssertSuccess
 
 trait AssertCancelled
 {
-	function assertCancelled(\AsyncInterop\Promise $promise) {
+	function assertCancelled($promise) {
 		$this->consumePromise($promise, $errors, $results);
 
 		$this->assertEmpty($results);
-		$this->assertStringMatchesFormat("%SCancelled%S", $errors[0]->getMessage());
+		$this->assertStringMatchesFormat("%SCancelled%S", \seekat\Exception\message($errors[0]));
 	}
 }
 

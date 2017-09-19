@@ -10,9 +10,9 @@ use seekat\API\Future;
 /**
  * Perform a GET request against the link's "first" relation
  *
- * @return Promise
+ * @return mixed promise
  */
-function first(API $api, Cache\Service $cache = null) : Promise {
+function first(API $api, Cache\Service $cache = null) {
 	$links = $api->getLinks();
 	if ($links && ($first = $links->getFirst())) {
 		return $api->withUrl($first)->get(null, null, $cache);
@@ -23,9 +23,9 @@ function first(API $api, Cache\Service $cache = null) : Promise {
 /**
  * Perform a GET request against the link's "prev" relation
  *
- * @return Promise
+ * @return mixed promise
  */
-function prev(API $api, Cache\Service $cache = null) : Promise {
+function prev(API $api, Cache\Service $cache = null) {
 	$links = $api->getLinks();
 	if ($links && ($prev = $links->getPrev())) {
 		return $api->withUrl($prev)->get(null, null, $cache);
@@ -36,9 +36,9 @@ function prev(API $api, Cache\Service $cache = null) : Promise {
 /**
  * Perform a GET request against the link's "next" relation
  *
- * @return Promise
+ * @return mixed promise
  */
-function next(API $api, Cache\Service $cache = null) : Promise {
+function next(API $api, Cache\Service $cache = null) {
 	$links = $api->getLinks();
 	if ($links && ($next = $links->getNext())) {
 		return $api->withUrl($next)->get(null, null, $cache);
@@ -49,9 +49,9 @@ function next(API $api, Cache\Service $cache = null) : Promise {
 /**
  * Perform a GET request against the link's "last" relation
  *
- * @return Promise
+ * @return mixed promise
  */
-function last(API $api, Cache\Service $cache = null) : Promise {
+function last(API $api, Cache\Service $cache = null) {
 	$links = $api->getLinks();
 	if ($links && ($last = $links->getLast())) {
 		return $api->withUrl($last)->get(null, null, $cache);

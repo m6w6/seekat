@@ -2,10 +2,8 @@
 
 namespace seekat\API;
 
-use AsyncInterop\Promise;
 use http\Url;
 use seekat\API;
-use seekat\Exception;
 
 final class Call
 {
@@ -24,7 +22,7 @@ final class Call
 		$this->call = $call;
 	}
 
-	function __invoke(array $args) : Promise {
+	function __invoke(array $args) {
 		if ($this->api->exists($this->call."_url", $url)) {
 			$url = new Url(uri_template($url, (array)current($args)));
 			$promise = $this->api->withUrl($url)->get(...$args);

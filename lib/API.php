@@ -2,7 +2,6 @@
 
 namespace seekat;
 
-use AsyncInterop\Promise;
 use Countable;
 use Generator;
 use http\{
@@ -125,31 +124,23 @@ class API implements IteratorAggregate, Countable {
 	 *
 	 * @param string $method The API's "path" element to ascend into
 	 * @param array $args Array of arguments forwarded to \seekat\API::get()
-	 * @return Promise
+	 * @return mixed promise
 	 */
-	function __call(string $method, array $args) : Promise {
+	function __call(string $method, array $args) {
 		/* We cannot implement an explicit then() method,
 		 * because the Promise implementation might think
 		 * we're actually implementing Thenable,
 		 * which might cause an infinite loop.
-		 * FIXXME: then/when
 		 */
-		if ($method === "when") {
-			$promise = $this->get();
-			$promise->when(...$args);
-			return $promise;
-		}
-
+		if ($method === "then"
 		/*
 		 * very short-hand version:
-		 * ->users->m6w6->gists->get()->when(...)
+		 * ->users->m6w6->gists->get()->then(...)
 		 * vs:
 		 * ->users->m6w6->gists(...)
 		 */
-		if (is_callable(current($args))) {
-			$promise = $this->get();
-			$promise->when(current($args));
-			return $promise;
+		||  is_callable(current($args))) {
+			return $this->future->handlePromise($this->get(), ...$args);
 		}
 
 		return (new Call($this, $method))($args);
@@ -159,10 +150,10 @@ class API implements IteratorAggregate, Countable {
 	 * Run the send loop through a generator
 	 *
 	 * @param callable|Generator $cbg A \Generator or a factory of a \Generator yielding promises
-	 * @return Promise The promise of the generator's return value
+	 * @return mixed The promise of the generator's return value
 	 * @throws InvalidArgumentException
 	 */
-	function __invoke($cbg) : Promise {
+	function __invoke($cbg) {
 		$this->logger->debug(__FUNCTION__);
 
 		$consumer = new Consumer($this->getFuture(), function() {
@@ -362,9 +353,9 @@ class API implements IteratorAggregate, Countable {
 	 *
 	 * @param mixed $args The HTTP query string parameters
 	 * @param array $headers The request's additional HTTP headers
-	 * @return Promise
+	 * @return mixed promise
 	 */
-	function head($args = null, array $headers = null, $cache = null) : Promise {
+	function head($args = null, array $headers = null, $cache = null) {
 		return $this->request("HEAD", $args, null, $headers, $cache);
 	}
 
@@ -373,9 +364,9 @@ class API implements IteratorAggregate, Countable {
 	 *
 	 * @param mixed $args The HTTP query string parameters
 	 * @param array $headers The request's additional HTTP headers
-	 * @return Promise
+	 * @return mixed promise
 	 */
-	function get($args = null, array $headers = null, $cache = null) : Promise {
+	function get($args = null, array $headers = null, $cache = null) {
 		return $this->request("GET", $args, null, $headers, $cache);
 	}
 
@@ -384,9 +375,9 @@ class API implements IteratorAggregate, Countable {
 	 *
 	 * @param mixed $args The HTTP query string parameters
 	 * @param array $headers The request's additional HTTP headers
-	 * @return Promise
+	 * @return mixed promise
 	 */
-	function delete($args = null, array $headers = null) : Promise {
+	function delete($args = null, array $headers = null) {
 		return $this->request("DELETE", $args, null, $headers);
 	}
 
@@ -396,9 +387,9 @@ class API implements IteratorAggregate, Countable {
 	 * @param mixed $body The HTTP message's body
 	 * @param mixed $args The HTTP query string parameters
 	 * @param array $headers The request's additional HTTP headers
-	 * @return Promise
+	 * @return mixed promise
 	 */
-	function post($body = null, $args = null, array $headers = null) : Promise {
+	function post($body = null, $args = null, array $headers = null) {
 		return $this->request("POST", $args, $body, $headers);
 	}
 
@@ -408,9 +399,9 @@ class API implements IteratorAggregate, Countable {
 	 * @param mixed $body The HTTP message's body
 	 * @param mixed $args The HTTP query string parameters
 	 * @param array $headers The request's additional HTTP headers
-	 * @return Promise
+	 * @return mixed promise
 	 */
-	function put($body = null, $args = null, array $headers = null) : Promise {
+	function put($body = null, $args = null, array $headers = null) {
 		return $this->request("PUT", $args, $body, $headers);
 	}
 
@@ -420,9 +411,9 @@ class API implements IteratorAggregate, Countable {
 	 * @param mixed $body The HTTP message's body
 	 * @param mixed $args The HTTP query string parameters
 	 * @param array $headers The request's additional HTTP headers
-	 * @return Promise
+	 * @return mixed promise
 	 */
-	function patch($body = null, $args = null, array $headers = null) : Promise {
+	function patch($body = null, $args = null, array $headers = null) {
 		return $this->request("PATCH", $args, $body, $headers);
 	}
 
@@ -477,9 +468,9 @@ class API implements IteratorAggregate, Countable {
 	 * @param mixed $body Thee HTTP message's body
 	 * @param array $headers The request's additional HTTP headers
 	 * @param Call\Cache\Service $cache
-	 * @return Promise
+	 * @return mixed promise
 	 */
-	private function request(string $method, $args = null, $body = null, array $headers = null, Call\Cache\Service $cache = null) : Promise {
+	private function request(string $method, $args = null, $body = null, array $headers = null, Call\Cache\Service $cache = null) {
 		if (isset($this->data)) {
 			$this->logger->debug("request -> resolve", [
 				"method"  => $method,

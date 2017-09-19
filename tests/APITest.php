@@ -1,6 +1,5 @@
 <?php
 
-use AsyncInterop\Promise;
 use seekat\API;
 
 class APITest extends BaseTest
@@ -44,7 +43,7 @@ class APITest extends BaseTest
 	 * @dataProvider provideAPI
 	 */
 	function testReturnsPromiseOnMethodCall($api) {
-		$this->assertInstanceOf(Promise::class, $api->baz());
+		$this->assertTrue($api->getFuture()->isPromise($api->baz()));
 	}
 
 	/**
@@ -58,7 +57,7 @@ class APITest extends BaseTest
 	 * @dataProvider provideHttpMethodAndAPI
 	 */
 	function testReturnsPromiseOnMethodCallForStandardHttpMethod($api, $method) {
-		$this->assertInstanceOf(Promise::class, $api->$method());
+		$this->assertTrue($api->getFuture()->isPromise($api->$method()));
 	}
 
 	/**

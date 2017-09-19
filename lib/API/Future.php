@@ -2,8 +2,6 @@
 
 namespace seekat\API;
 
-use AsyncInterop\Promise;
-
 interface Future
 {
 	/**
@@ -14,34 +12,48 @@ interface Future
 
 	/**
 	 * @param object $context Promisor
-	 * @return Promise
+	 * @return mixed promise
 	 */
-	function getPromise($context) : Promise;
+	function getPromise($context);
 
 	/**
-	 * @param Promise $promise
+	 * @param mixed $promise
 	 * @return bool
 	 */
-	function cancelPromise(Promise $promise) : bool;
+	function isPromise($promise) : bool;
+
+	/**
+	 * @param mixed $promise
+	 * @return bool
+	 */
+	function cancelPromise($promise) : bool;
+
+	/**
+	 * @param mixed $promise
+	 * @param callable|null $onResult
+	 * @param callable|null $onError
+	 * @return mixed promise
+	 */
+	function handlePromise($promise, callable $onResult = null, callable $onError = null);
 
 	/**
 	 * @param object $context Promisor returned by createContext
 	 * @param mixed $value
 	 * @return void
 	 */
-	function onSuccess($context, $value);
+	function resolve($context, $value);
 
 	/**
-	 * @param object $context Proisor returned by createContext
+	 * @param object $context Promisor returned by createContext
 	 * @param mixed $reason
 	 * @return void
 	 */
-	function onFailure($context, $reason);
+	function reject($context, $reason);
 
 	/**
 	 * @param object $context Promisor returned by createContext
 	 * @param array $promises
-	 * @return Promise
+	 * @return mixed promise
 	 */
-	function onMultiple($context, array $promises) : Promise;
+	function all($context, array $promises);
 }

@@ -8,18 +8,18 @@ $api = new seekat\API(seekat\API\Future\react(), [
 ]);
 array_shift($argv);
 
-($self = function($error, $api) use(&$self) {
+($self = function($api) use(&$self) {
 	global $argv;
 
 	while (null !== ($arg = array_shift($argv))) {
 		if ("." === $arg) {
-			$api->when($self);
+			$api->then($self);
 			return;
 		}
 		$api = $api->$arg;
 	}
 
 	echo $api, "\n";
-})(null, $api);
+})($api);
 
 $api->send();

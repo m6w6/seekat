@@ -3,29 +3,30 @@
 namespace seekat\API\Future;
 
 use Amp\Deferred as AmpDeferred;
-use AsyncInterop\Promise;
+use Amp\Promise as AmpPromise;
 use React\Promise\Deferred as ReactDeferred;
+use React\Promise\PromiseInterface as ReactPromise;
 use seekat\API\Future;
 
 /**
  * @param Future $future
  * @param mixed $value
- * @return Promise
+ * @return mixed promise
  */
 function resolve(Future $future, $value) {
 	$promisor = $future->createContext();
-	$future->onSuccess($promisor, $value);
+	$future->resolve($promisor, $value);
 	return $future->getPromise($promisor);
 }
 
 /**
  * @param Future $future
  * @param mixed $reason
- * @return Promise
+ * @return mixed promise
  */
 function reject(Future $future, $reason) {
 	$promisor = $future->createContext();
-	$future->onFailure($promisor, $reason);
+	$future->reject($promisor, $reason);
 	return $future->getPromise($promisor);
 }
 
@@ -36,7 +37,7 @@ function reject(Future $future, $reason) {
  */
 function resolver(Future $future, $context) {
 	return function($value) use($future, $context) {
-		return $future->onSuccess($context, $value);
+		return $future->resolve($context, $value);
 	};
 }
 
@@ -47,7 +48,7 @@ function resolver(Future $future, $context) {
  */
 function rejecter(Future $future, $context) {
 	return function($reason) use($future, $context) {
-		return $future->onFailure($context, $reason);
+		return $future->reject($context, $reason);
 	};
 }
 
@@ -57,8 +58,8 @@ function rejecter(Future $future, $context) {
  * @return \Closure
  */
 function reducer(Future $future, $context) {
-	return function(array $promises) use($future, $context) : Promise {
-		return $future->onMultiple($context, $promises);
+	return function(array $promises) use($future, $context) {
+		return $future->all($context, $promises);
 	};
 }
 
@@ -75,28 +76,36 @@ function react() {
 			return new ReactDeferred($onCancel);
 		}
 
-		function getPromise($context) : Promise {
+		function getPromise($context) {
 			/* @var $context ReactDeferred */
 			return $context->promise();
 		}
 
-		function cancelPromise(Promise $promise) : bool {
+		function isPromise($promise) : bool {
+			return $promise instanceof ReactPromise;
+		}
+
+		function handlePromise($promise, callable $onResult = null, callable $onError = null) {
+			return $promise->then($onResult, $onError);
+		}
+
+		function cancelPromise($promise) : bool {
 			/* @var $promise \React\Promise\Promise */
 			$promise->cancel();
 			return true;
 		}
 
-		function onSuccess($context, $value) {
+		function resolve($context, $value) {
 			/* @var $context ReactDeferred */
 			$context->resolve($value);
 		}
 
-		function onFailure($context, $reason) {
+		function reject($context, $reason) {
 			/* @var $context ReactDeferred */
 			$context->reject($reason);
 		}
 
-		function onMultiple($context, array $promises) : Promise {
+		function all($context, array $promises) {
 			return \React\Promise\all($promises);
 		}
 	};
@@ -114,26 +123,45 @@ function amp() {
 			return new AmpDeferred();
 		}
 
-		function getPromise($context) : Promise {
+		function getPromise($context) {
 			/* @var $context AmpDeferred */
 			return $context->promise();
 		}
 
-		function cancelPromise(Promise $promise) : bool {
+		function isPromise($promise) : bool {
+			return $promise instanceof AmpPromise;
+		}
+
+		function handlePromise($promise, callable $onResult = null, callable $onError = null) {
+			$promise->onResolve(function($error = null, $result = null) use($onResult, $onError) {
+				if ($error) {
+					if ($onError) {
+						$onError($error);
+					}
+				} else {
+					if ($onResult) {
+						$onResult($result);
+					}
+				}
+			});
+			return $promise;
+		}
+
+		function cancelPromise($promise) : bool {
 			return false;
 		}
 
-		function onSuccess($context, $value) {
+		function resolve($context, $value) {
 			/* @var $context AmpDeferred */
 			$context->resolve($value);
 		}
 
-		function onFailure($context, $reason) {
+		function reject($context, $reason) {
 			/* @var $context AmpDeferred */
 			$context->fail(\seekat\Exception\exception($reason));
 		}
 
-		function onMultiple($context, array $promises) : Promise {
+		function all($context, array $promises) {
 			return \Amp\all($promises);
 		}
 	};

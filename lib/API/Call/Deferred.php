@@ -2,7 +2,6 @@
 
 namespace seekat\API\Call;
 
-use AsyncInterop\Promise;
 use http\{
 	Client, Client\Request, Client\Response
 };
@@ -52,7 +51,7 @@ final class Deferred
 	private $response;
 
 	/**
-	 * @var Promise
+	 * @var mixed
 	 */
 	private $promise;
 
@@ -100,7 +99,7 @@ final class Deferred
 		$this->reject = API\Future\rejecter($future, $context);
 	}
 
-	function __invoke() : Promise {
+	function __invoke() {
 		if ($this->cache->load($this->request, $cached)) {
 			$this->logger->info("deferred -> cached", [
 				"method" => $this->request->getRequestMethod(),

@@ -11,7 +11,7 @@ $log->pushHandler((new Monolog\Handler\StreamHandler(STDERR))->setLevel(Monolog\
 
 $cli = new http\Client("curl", "seekat");
 
-$api = new API(API\Future\react(), [
+$api = new API(API\Future\amp(), [
 	"Authorization" => "token ".getenv("GITHUB_TOKEN")
 ], null, $cli, $log);
 
@@ -38,7 +38,7 @@ $api(function($api) {
 		$events = yield $next;
 	}
 	return $count;
-})->when(function($error, $count) {
+})->onResolve(function($error, $count) {
 	printf("Listed %d events\n", $count);
 });
 

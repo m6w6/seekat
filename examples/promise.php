@@ -7,10 +7,10 @@ use seekat\API;
 
 $api = new API(API\Future\amp(), API\auth("token", getenv("GITHUB_TOKEN")));
 
-$api->users->m6w6->gists()->when(function($error, $gists) {
+$api->users->m6w6->gists()->onResolve(function($error, $gists) {
 	$error and die($error);
 	foreach ($gists as $gist) {
-		$gist->commits()->when(function($error, $commits) use($gist) {
+		$gist->commits()->onResolve(function($error, $commits) use($gist) {
 			$error and die($error);
 			foreach ($commits as $i => $commit) {
 				if (!$i) {

@@ -29,14 +29,12 @@
         "seebz/uri-template": "dev-master",
 		"psr/log": "^1.0",
         "psr/cache": "^1.0",
-        "psr/simple-cache": "^1.0",
-        "async-interop/promise": "^0.4.0"
+        "psr/simple-cache": "^1.0"
     },
     "require-dev": {
-        "react/promise": "dev-async-interop",
-        "amphp/amp": "dev-master",
-        "amphp/loop": "dev-master",
-        "monolog/monolog": "^1.19",
+        "amphp/amp": "^2",
+        "react/promise": "^2",
+        "monolog/monolog": "^1",
         "phpunit/phpunit": "^5"
     }
 }

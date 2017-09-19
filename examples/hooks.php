@@ -30,7 +30,8 @@ $api(function() use($api) {
 		foreach ($repos as $repo) {
 			$batch[] = $repo->hooks();
 		}
-		foreach (yield $batch as $key => $hooks) {
+		$result = yield $batch;
+		foreach ($result as $key => $hooks) {
 			if (!count($hooks)) {
 				continue;
 			}
