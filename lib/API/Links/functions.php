@@ -2,7 +2,6 @@
 
 namespace seekat\API\Links;
 
-use AsyncInterop\Promise;
 use seekat\API;
 use seekat\API\Call\Cache;
 use seekat\API\Future;

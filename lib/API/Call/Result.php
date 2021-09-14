@@ -7,24 +7,30 @@ use http\Header;
 use seekat\API;
 use seekat\Exception\RequestException;
 
-final class Result
-{
+final class Result {
 	private $api;
 
 	function __construct(API $api) {
 		$this->api = $api;
 	}
 
+	/**
+	 * @param Response $response
+	 * @return API
+	 * @throws RequestException
+	 */
 	function __invoke(Response $response) : API {
-		$hit = $response->getHeader("X-Cache-Time") ? "cached" : "enqueued";
-		$this->api->getLogger()->info("$hit -> response", [
-			"url"  => (string) $this->api->getUrl(),
-			"info" => $response->getInfo(),
-		]);
-
 		$links = $this->checkResponseMeta($response);
 		$type = $this->checkResponseType($response);
 		$data = $this->checkResponseBody($response, $type);
+
+		$this->api->getLogger()->info("response -> info", [
+			"type" => $type->getType(),
+			"links" => $links->getRelations(),
+		]);
+		$this->api->getLogger()->debug("response -> data", [
+			"data" => $data,
+		]);
 
 		return $this->api = $this->api->with(compact("type", "data", "links"));
 	}
@@ -52,6 +58,11 @@ final class Result
 		return new API\Links($link);
 	}
 
+	/**
+	 * @param Response $response
+	 * @return API\ContentType
+	 * @throws RequestException
+	 */
 	private function checkResponseType(Response $response) {
 		if (!($type = $response->getHeader("Content-Type", Header::class))) {
 			$e = new RequestException($response);
@@ -63,12 +74,18 @@ final class Result
 			throw $e;
 		}
 
-		return new API\ContentType($type);
+		return new API\ContentType($this->api->getVersion(), $type->value);
 	}
 
+	/**
+	 * @param Response $response
+	 * @param API\ContentType $type
+	 * @return mixed
+	 * @throws \Exception
+	 */
 	private function checkResponseBody(Response $response, API\ContentType $type) {
 		try {
-			$data = $type->parseBody($response->getBody());
+			$data = $type->decode($response->getBody());
 		} catch (\Exception $e) {
 			$this->api->getLogger()->error("response -> error: ".$e->getMessage(), [
 				"url" => (string) $this->api->getUrl(),

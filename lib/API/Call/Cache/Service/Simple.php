@@ -6,8 +6,7 @@ use http\Client\Response;
 use Psr\SimpleCache\CacheInterface;
 use seekat\API\Call\Cache\Service;
 
-final class Simple implements Service
-{
+final class Simple implements Service {
 	/**
 	 * @var CacheInterface
 	 */
@@ -24,6 +23,10 @@ final class Simple implements Service
 
 	public function store(string $key, Response $response) : bool {
 		return $this->cache->set($key, $response);
+	}
+
+	public function del(string $key) {
+		$this->cache->delete($key);
 	}
 
 	public function clear() {

@@ -84,12 +84,14 @@ $cli->configure([
 			$this->driver->setState((string) $socket, $id);
 			break;
 		case self::POLL_INOUT:
-			$id[] = $this->driver->onReadable($socket, function($id, $socket) {
-				$this->run($socket, self::POLL_IN);
-			});
-			$id[] = $this->driver->onWritable($socket, function($id, $socket) {
-				$this->run($socket, self::POLL_OUT);
-			});
+			$id = [
+				$this->driver->onReadable($socket, function($id, $socket) {
+					$this->run($socket, self::POLL_IN);
+				}),
+				$this->driver->onWritable($socket, function($id, $socket) {
+					$this->run($socket, self::POLL_OUT);
+				})
+			];
 			$this->driver->setState((string) $socket, $id);
 			break;
 		case self::POLL_REMOVE:

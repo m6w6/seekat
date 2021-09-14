@@ -2,15 +2,12 @@
 
 namespace seekat\API;
 
+use Exception;
 use Generator;
-use http\Client;
 use seekat\API;
-use seekat\Exception\{
-	InvalidArgumentException, UnexpectedValueException, function exception
-};
+use seekat\Exception\{function exception};
 
-final class Consumer
-{
+final class Consumer {
 	/**
 	 * Loop
 	 * @var callable
@@ -79,7 +76,6 @@ final class Consumer
 	 */
 	function __invoke(Generator $gen) {
 		$this->cancelled = false;
-
 		foreach ($gen as $promise) {
 			if ($this->cancelled) {
 				break;
@@ -87,15 +83,14 @@ final class Consumer
 			$this->give($promise, $gen);
 		}
 
-		#($this->loop)();
-
-		if (!$this->cancelled) {
-			$this->result = $gen->getReturn();
-		}
-		if (isset($this->result)) {
-			($this->resolve)($this->result);
-		} else {
+		if ($this->cancelled) {
 			($this->reject)("Cancelled");
+		} else {
+			try {
+				$this->result = $gen->getReturn();
+			} catch (Exception $e) {
+			}
+			($this->resolve)($this->result);
 		}
 
 		return $this->context->promise();

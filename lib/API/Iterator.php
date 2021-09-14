@@ -3,9 +3,10 @@
 namespace seekat\API;
 
 use http\Url;
+use Iterator as BaseIterator;
 use seekat\API;
 
-final class Iterator implements \Iterator
+class Iterator implements BaseIterator
 {
 	/**
 	 * The endpoint

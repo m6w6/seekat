@@ -11,17 +11,17 @@ class ContentTypeTest extends BaseTest
 	 * @dataProvider provideAPI
 	 */
 	function testIsAbleToApplyVersionedContentTypeToApi($api) {
-		$api = ContentType::apply($api, "json");
+		$api = (new ContentType($api->getVersion(), "json"))->apply($api);
 		$this->assertEquals(
 			$this->getVersionedContentType("json")->value,
 			$api->export()["headers"]["Accept"]);
 
-		$api = ContentType::apply($api, "+raw");
+		$api = (new ContentType($api->getVersion(), "+raw"))->apply($api);
 		$this->assertEquals(
 			$this->getVersionedContentType("+raw")->value,
 			$api->export()["headers"]["Accept"]);
 
-		$api = ContentType::apply($api, ".html");
+		$api = (new ContentType($api->getVersion(), ".html"))->apply($api);
 		$this->assertEquals(
 			$this->getVersionedContentType(".html")->value,
 			$api->export()["headers"]["Accept"]);
@@ -32,16 +32,8 @@ class ContentTypeTest extends BaseTest
 	 * @dataProvider provideAPI
 	 */
 	function testIsAbleToApplyBasicContentTypeToApi($api) {
-		$api = ContentType::apply($api, "text/plain");
+		$api = (new ContentType($api->getVersion(), "text/plain"))->apply($api);
 		$this->assertEquals("text/plain", $api->export()["headers"]["Accept"]);
-	}
-
-	/**
-	 * @group testdox
-	 */
-	function testUserCanOverrideApiVersion() {
-		$this->assertEquals(3, ContentType::version(2));
-		$this->assertEquals(2, ContentType::version(3));
 	}
 
 	/**
@@ -49,7 +41,17 @@ class ContentTypeTest extends BaseTest
 	 */
 	function testAllowsToRegisterAndUnregisterContentTypeHandlers() {
 		$this->assertFalse(ContentType::registered("foobar"));
-		ContentType::register("foobar", function() {});
+		ContentType::register(new class implements ContentType\Handler {
+			function types() : array {
+				return ["foobar"];
+			}
+			function encode($data): Body {
+				return new Body;
+			}
+			function decode(Body $body) {
+				return (string) $body;
+			}
+		});
 		$this->assertTrue(ContentType::registered("foobar"));
 		ContentType::unregister("foobar");
 		$this->assertFalse(ContentType::registered("foobar"));
@@ -59,25 +61,28 @@ class ContentTypeTest extends BaseTest
 	 * @group testdox
 	 */
 	function testAcceptsContentTypeHeader() {
-		new ContentType(new Header("Content-Type"));
-		new ContentType(new Header("content-type"));
+		$ct = new ContentType;
+		$ct->setContentTypeHeader(new Header("Content-Type", "TitleCase"));
+		$this->assertSame("TitleCase", $ct->getType());
+		$ct->setContentTypeHeader(new Header("content-type", "lowercase"));
+		$this->assertSame("lowercase", $ct->getType());
 	}
 
 	/**
 	 * @group testdox
-	 * @expectedException \seekat\Exception\InvalidArgumentException
 	 */
 	function testDoesNotAcceptNonContentTypeHeader() {
-		new ContentType(new Header("ContentType"));
+		$this->expectException(\seekat\Exception\InvalidArgumentException::class);
+		(new ContentType)->setContentTypeHeader(new Header("ContentType"));
 	}
 
 	/**
 	 * @group testdox
-	 * @expectedException \seekat\Exception\UnexpectedValueException
 	 */
 	function testThrowsOnUnknownContentType() {
-		$ct = new ContentType($this->getVersionedContentType("foo"));
-		$ct->parseBody((new Body)->append("foo"));
+		$this->expectException(\seekat\Exception\UnexpectedValueException::class);
+		$ct = new ContentType(3, "foo");
+		$ct->decode((new Body)->append("foo"));
 	}
 
 	/**
@@ -85,8 +90,8 @@ class ContentTypeTest extends BaseTest
 	 */
 	function testHandlesJson() {
 		$this->assertTrue(ContentType::registered("json"));
-		$ct = new ContentType(new Header("Content-Type", "application/json"));
-		$result = $ct->parseBody((new Body())->append("[1,2,3]"));
+		$ct = new ContentType(3, "application/json");
+		$result = $ct->decode((new Body())->append("[1,2,3]"));
 		$this->assertEquals([1, 2, 3], $result);
 		return $ct;
 	}
@@ -94,10 +99,10 @@ class ContentTypeTest extends BaseTest
 	/**
 	 * @group testdox
 	 * @depends testHandlesJson
-	 * @expectedException \seekat\Exception\UnexpectedValueException
 	 */
 	function testThrowsOnInvalidJson(ContentType $ct) {
-		$ct->parseBody((new Body)->append("yaml:\n - data"));
+		$this->expectException(\seekat\Exception\UnexpectedValueException::class);
+		$ct->decode((new Body)->append("yaml:\n - data"));
 	}
 
 	/**
@@ -105,8 +110,8 @@ class ContentTypeTest extends BaseTest
 	 */
 	function testHandlesBase64() {
 		$this->assertTrue(ContentType::registered("base64"));
-		$ct = new ContentType($this->getVersionedContentType("base64"));
-		$result = $ct->parseBody((new Body())->append(base64_encode("This is a test")));
+		$ct = new ContentType(3,"base64");
+		$result = $ct->decode((new Body())->append(base64_encode("This is a test")));
 		$this->assertEquals("This is a test", $result);
 		return $ct;
 	}
@@ -114,10 +119,10 @@ class ContentTypeTest extends BaseTest
 	/**
 	 * @group testdox
 	 * @depends testHandlesBase64
-	 * @expectedException \seekat\Exception\UnexpectedValueException
 	 */
 	function testThrowsOnInvalidBase64(ContentType $ct) {
-		$ct->parseBody((new Body)->append("[1,2,3]"));
+		$this->expectException(\seekat\Exception\UnexpectedValueException::class);
+		$ct->decode((new Body)->append("[1,2,3]"));
 	}
 
 	/**
@@ -125,9 +130,9 @@ class ContentTypeTest extends BaseTest
 	 */
 	function testHandlesOctetStream() {
 		$this->assertTrue(ContentType::registered("application/octet-stream"));
-		$ct = new ContentType(new Header("Content-Type", "application/octet-stream"));
-		$result = $ct->parseBody((new Body)->append("This is a test"));
-		$this->assertInternalType("resource", $result);
+		$ct = new ContentType(3,"application/octet-stream");
+		$result = $ct->decode((new Body)->append("This is a test"));
+		$this->assertIsResource($result);
 		rewind($result);
 		$this->assertEquals("This is a test", stream_get_contents($result));
 	}
@@ -137,9 +142,9 @@ class ContentTypeTest extends BaseTest
 	 */
 	function testHandlesData() {
 		$this->assertTrue(ContentType::registered("text/plain"));
-		$ct = new ContentType(new Header("Content-Type", "text/plain"));
-		$result = $ct->parseBody((new Body)->append("This is a test"));
-		$this->assertInternalType("string", $result);
+		$ct = new ContentType(3,"text/plain");
+		$result = $ct->decode((new Body)->append("This is a test"));
+		$this->assertIsString($result);
 		$this->assertEquals("This is a test", $result);
 	}
 
@@ -148,7 +153,7 @@ class ContentTypeTest extends BaseTest
 	 * @return Header Content-Type header
 	 */
 	private function getVersionedContentType($type) {
-		switch ($type{0}) {
+		switch ($type[0]) {
 			case ".":
 			case "+":
 			case "":
@@ -157,6 +162,6 @@ class ContentTypeTest extends BaseTest
 				$type = ".$type";
 		}
 		return new Header("Content-Type",
-			sprintf("application/vnd.github.v%d%s", ContentType::version(), $type));
+			sprintf("application/vnd.github.v3%s", $type));
 	}
 }

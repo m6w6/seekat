@@ -4,19 +4,20 @@ namespace seekat;
 
 use Countable;
 use Generator;
-use http\{
-	Client, Client\Request, Message\Body, QueryString, Url
-};
+use http\{Client, Client\Request, Message\Body, QueryString, Url};
+use Iterator;
 use IteratorAggregate;
-use Psr\Log\{
-	LoggerInterface, NullLogger
-};
-use seekat\API\{
-	Call, Consumer, ContentType, Future, Iterator, Links
-};
+use Psr\Log\{LoggerInterface, NullLogger};
+use seekat\API\{Call, Consumer, ContentType, Future, Links};
 use seekat\Exception\InvalidArgumentException;
 
 class API implements IteratorAggregate, Countable {
+	/**
+	 * API version
+	 * @var int
+	 */
+	private $version = 3;
+
 	/**
 	 * The current API endpoint URL
 	 * @var Url
@@ -74,6 +75,8 @@ class API implements IteratorAggregate, Countable {
 	/**
 	 * Create a new API endpoint root
 	 *
+	 * @codeCoverageIgnore
+	 *
 	 * @param Future $future pretending to fulfill promises
 	 * @param array $headers Standard request headers, defaults to ["Accept" => "application/vnd.github.v3+json"]
 	 * @param Url $url The API's endpoint, defaults to https://api.github.com
@@ -87,8 +90,9 @@ class API implements IteratorAggregate, Countable {
 		$this->logger = $log ?? new NullLogger;
 		$this->url = $url ?? new Url("https://api.github.com");
 		$this->client = $client ?? new Client;
+		$this->type = new ContentType($this->version, "json");
 		$this->headers = (array) $headers + [
-			"Accept" => "application/vnd.github.v3+json"
+			"Accept" => $this->type->getContentType()
 		];
 	}
 
@@ -114,6 +118,7 @@ class API implements IteratorAggregate, Countable {
 				(string) $this->url,
 				(string) $that->url
 			],
+			"data" => $that->data
 		]);
 
 		return $that;
@@ -157,7 +162,7 @@ class API implements IteratorAggregate, Countable {
 		$this->logger->debug(__FUNCTION__);
 
 		$consumer = new Consumer($this->getFuture(), function() {
-			$this->client->send();
+				$this->client->send();
 		});
 
 		invoke:
@@ -188,12 +193,7 @@ class API implements IteratorAggregate, Countable {
 	 * @return string
 	 */
 	function __toString() : string {
-		if (is_scalar($this->data)) {
-			return (string) $this->data;
-		}
-
-		/* FIXME */
-		return json_encode($this->data);
+		return (string) $this->type->encode($this->data);
 	}
 
 	/**
@@ -202,7 +202,15 @@ class API implements IteratorAggregate, Countable {
 	 * @return Iterator
 	 */
 	function getIterator() : Iterator {
-		return new Iterator($this);
+		foreach ($this->data as $key => $cur) {
+			if ($this->__get($key)->exists("url", $url)) {
+				$url = new Url($url);
+				$val = $this->withUrl($url)->withData($cur);
+			} else {
+				$val = $this->__get($key)->withData($cur);
+			}
+			yield $key => $val;
+		}
 	}
 
 	/**
@@ -211,7 +219,20 @@ class API implements IteratorAggregate, Countable {
 	 * @return int
 	 */
 	function count() : int {
-		return count($this->data);
+		if (is_array($this->data)) {
+			$count = count($this->data);
+		} else if ($this->data instanceof Countable) {
+			$count = count($this->data);
+		} else if (is_object($this->data)) {
+			$count = count((array) $this->data);
+		} else {
+			$count = 0;
+		}
+		$this->logger->debug("count()", [
+			"of type" => typeof($this->data),
+			"count" => $count
+		]);
+		return $count;
 	}
 
 	/**
@@ -256,6 +277,13 @@ class API implements IteratorAggregate, Countable {
 	 */
 	function getLinks() {
 		return $this->links;
+	}
+
+	/**
+	 * @return int
+	 */
+	function getVersion() : int {
+		return $this->version;
 	}
 
 	/**
@@ -341,7 +369,11 @@ class API implements IteratorAggregate, Countable {
 	 * @return API clone
 	 */
 	function as(string $type, bool $keepdata = true) : API {
-		$that = ContentType::apply($this, $type);
+		$ct = new ContentType($this->version, $type);
+
+		$that = $ct->apply($this);
+		$that->type = $ct;
+
 		if (!$keepdata) {
 			$that->data = null;
 		}
@@ -454,7 +486,7 @@ class API implements IteratorAggregate, Countable {
 			$seg, typeof($this->data, false), $exists ? "true" : "false"
 		), [
 			"url" => (string) $this->url,
-			"val" => $val,
+			"val" => typeof($val, false),
 		]);
 
 		return $exists;
@@ -485,10 +517,7 @@ class API implements IteratorAggregate, Countable {
 
 		$url = $this->url->mod(["query" => new QueryString($args)]);
 		$request = new Request($method, $url, ((array) $headers) + $this->headers,
-			 $body = is_array($body) ? json_encode($body) : (
-				is_resource($body) ? new Body($body) : (
-					is_scalar($body) ? (new Body)->append($body) :
-						$body)));
+			 $body = $this->type->encode(is_resource($body) ? new Body($body) : $body));
 
 		$this->logger->info("request -> deferred", [
 			"method" => $method,

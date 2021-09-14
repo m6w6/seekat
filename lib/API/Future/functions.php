@@ -37,7 +37,7 @@ function reject(Future $future, $reason) {
  */
 function resolver(Future $future, $context) {
 	return function($value) use($future, $context) {
-		return $future->resolve($context, $value);
+		$future->resolve($context, $value);
 	};
 }
 
@@ -48,7 +48,7 @@ function resolver(Future $future, $context) {
  */
 function rejecter(Future $future, $context) {
 	return function($reason) use($future, $context) {
-		return $future->reject($context, $reason);
+		$future->reject($context, $reason);
 	};
 }
 
@@ -89,10 +89,9 @@ function react() {
 			return $promise->then($onResult, $onError);
 		}
 
-		function cancelPromise($promise) : bool {
+		function cancelPromise($promise) {
 			/* @var $promise \React\Promise\Promise */
 			$promise->cancel();
-			return true;
 		}
 
 		function resolve($context, $value) {
@@ -120,7 +119,12 @@ function amp() {
 		 * @return AmpDeferred
 		 */
 		function createContext(callable $onCancel = null) {
-			return new AmpDeferred();
+			$context = new AmpDeferred();
+			/** @noinspection PhpUndefinedFieldInspection */
+			$context->promise()->cancel = function() use($onCancel, $context) {
+				$onCancel();
+			};
+			return $context;
 		}
 
 		function getPromise($context) {
@@ -147,8 +151,10 @@ function amp() {
 			return $promise;
 		}
 
-		function cancelPromise($promise) : bool {
-			return false;
+		function cancelPromise($promise) {
+			/** @var $promise AmpPromise */
+			/** @noinspection PhpUndefinedFieldInspection */
+			($promise->cancel)();
 		}
 
 		function resolve($context, $value) {
@@ -162,7 +168,7 @@ function amp() {
 		}
 
 		function all($context, array $promises) {
-			return \Amp\all($promises);
+			return \Amp\Promise\all($promises);
 		}
 	};
 }

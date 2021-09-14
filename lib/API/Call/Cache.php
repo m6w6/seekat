@@ -9,8 +9,7 @@ use seekat\API\Call\Cache\Service;
 use seekat\API\Call\Cache\Service\Hollow;
 
 
-final class Cache
-{
+final class Cache {
 	/**
 	 * @var Service
 	 */
@@ -68,7 +67,37 @@ final class Cache
 			}
 			return false;
 		}
+		$response->setHeader("X-Cache-Hit", $response->getHeader("X-Cache-Hit") + 1);
 		return true;
 	}
 
+	/**
+	 * Update call data
+	 * @param Request $request
+	 * @param Response $response
+	 * @return bool
+	 */
+	public function update(Request $request, Response &$response) : bool {
+		$ctl = new Control($request);
+		if (!$ctl->isValid()) {
+			return false;
+		}
+
+		if ($response->getResponseCode() !== 304) {
+			return $this->save($request, $response);
+		}
+
+		/** @var Response $cached */
+		if (!$this->cache->fetch($ctl->getKey(), $cached)) {
+			return $this->save($request, $response);
+		}
+
+		if ($response->getHeader("ETag") !== $cached->getHeader("ETag")) {
+			return $this->save($request, $response);
+		}
+
+		$cached->setHeader("X-Cache-Update", $cached->getHeader("X-Cache-Update") + 1);
+		$response = $cached;
+		return true;
+	}
 }

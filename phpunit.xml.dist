@@ -1,0 +1,22 @@
+<?xml version="1.0"?>
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" bootstrap="tests/bootstrap.php" convertErrorsToExceptions="true" convertNoticesToExceptions="true" convertWarningsToExceptions="true" stopOnError="false" stopOnFailure="false" stopOnIncomplete="false" stopOnSkipped="false" stopOnRisky="true" colors="true" printerClass="CombinedTestdoxPrinter" xsi:noNamespaceSchemaLocation="https://schema.phpunit.de/9.3/phpunit.xsd">
+  <coverage processUncoveredFiles="true">
+    <include>
+      <directory suffix=".php">lib</directory>
+    </include>
+    <report>
+      <clover outputFile="clover.xml"/>
+      <html outputDirectory="code-coverage-report"/>
+    </report>
+  </coverage>
+  <testsuites>
+    <testsuite name="seekat tests">
+      <directory>tests</directory>
+    </testsuite>
+  </testsuites>
+  <listeners>
+    <listener class="DebugLogListener"/>
+    <listener class="TestdoxListener"/>
+  </listeners>
+  <logging/>
+</phpunit>

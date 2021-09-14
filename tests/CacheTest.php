@@ -6,11 +6,11 @@ class CacheTest extends BaseTest
 	use AssertSuccess;
 
 	/**
-	 * @var seekat\API\Cache\Service
+	 * @var seekat\API\Call\Cache\Service
 	 */
 	private $cache;
 
-	function setUp() {
+	function setUp() : void {
 		$this->cache = new seekat\API\Call\Cache\Service\Hollow;
 	}
 
@@ -26,7 +26,7 @@ class CacheTest extends BaseTest
 		$this->assertEquals("m6w6", $m6w6->login);
 		$this->assertEquals("m6w6", $m6w6_->login);
 
-		$this->assertInternalType("array", $data);
+		$this->assertIsArray($data);
 		$this->assertCount(1, $data);
 		$this->assertEquals($data, $this->cache->getStorage());
 	}

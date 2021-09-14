@@ -2,14 +2,11 @@
 
 namespace seekat\API\Call;
 
-use http\{
-	Client, Client\Request, Client\Response
-};
+use http\{Client, Client\Request, Client\Response};
 use Psr\Log\LoggerInterface;
 use seekat\API;
 
-final class Deferred
-{
+final class Deferred {
 	/**
 	 * The response importer
 	 *
@@ -66,11 +63,6 @@ final class Deferred
 	private $reject;
 
 	/**
-	 * @var \Closure
-	 */
-	private $update;
-
-	/**
 	 * Create a deferred promise for the response of $request
 	 *
 	 * @param API $api The endpoint of the request
@@ -100,51 +92,93 @@ final class Deferred
 	}
 
 	function __invoke() {
-		if ($this->cache->load($this->request, $cached)) {
-			$this->logger->info("deferred -> cached", [
-				"method" => $this->request->getRequestMethod(),
-				"url" => $this->request->getRequestUrl(),
-			]);
-
-			$this->response = $cached;
-			$this->complete();
-		} else {
-			$this->client->enqueue($this->request, function(Response $response) use($cached) {
-				if ($response->getResponseCode() == 304) {
-					$this->response = $cached;
-				} else {
-					$this->response = $response;
-				}
-				$this->complete();
-				return true;
-			});
-			$this->logger->info("deferred -> enqueued", [
-				"method" => $this->request->getRequestMethod(),
-				"url" => $this->request->getRequestUrl(),
-			]);
-			/* start off */
-			$this->client->once();
+		if (!$this->cached($cached)) {
+			$this->refresh($cached);
 		}
 
 		return $this->promise;
 	}
 
 	/**
+	 * Peek into cache
+	 *
+	 * @param Response $cached
+	 * @return bool
+	 */
+	private function cached(Response &$cached = null) : bool {
+		$fresh = $this->cache->load($this->request, $cachedResponse);
+
+		if (!$cachedResponse) {
+			return false;
+		} else {
+			$cached = $cachedResponse;
+
+			$this->logger->info("deferred -> cached", [
+				"method" => $this->request->getRequestMethod(),
+				"url" => $this->request->getRequestUrl(),
+			]);
+
+
+			if (!$fresh) {
+				$this->logger->info("cached -> stale", [
+					"method" => $this->request->getRequestMethod(),
+					"url"    => $this->request->getRequestUrl(),
+				]);
+				return false;
+			}
+		}
+
+		$this->response = $cached;
+		$this->complete("cached");
+		return true;
+	}
+
+	/**
+	 * Refresh
+	 *
+	 * @param Response|null $cached
+	 */
+	private function refresh(Response $cached = null) {
+		$this->client->enqueue($this->request, function(Response $response) use($cached) {
+			$this->response = $response;
+			$this->complete();
+			return true;
+		});
+
+		$this->logger->info(($cached ? "stale" : "deferred") . " -> enqueued", [
+			"method" => $this->request->getRequestMethod(),
+			"url" => $this->request->getRequestUrl(),
+		]);
+
+		/* start off */
+		$this->client->once();
+	}
+
+	/**
 	 * Completion callback
 	 */
-	private function complete() {
+	private function complete(string $by = "enqueued") {
 		if ($this->response) {
+			$this->logger->info("$by -> response", [
+				"url"  => $this->request->getRequestUrl(),
+				"info" => $this->response->getInfo(),
+			]);
+
 			try {
-				$api = ($this->result)($this->response);
-
-				$this->cache->save($this->request, $this->response);
-
-				($this->resolve)($api);
+				$this->cache->update($this->request, $this->response);
+				($this->resolve)(($this->result)($this->response));
 			} catch (\Throwable $e) {
 				($this->reject)($e);
 			}
 		} else {
-			($this->reject)($this->client->getTransferInfo($this->request)->error);
+			$info = $this->client->getTransferInfo($this->request);
+
+			$this->logger->warning("$by -> no response", [
+				"url"  => $this->request->getRequestUrl(),
+				"info" => $info
+			]);
+
+			($this->reject)($info->error);
 		}
 	}
 

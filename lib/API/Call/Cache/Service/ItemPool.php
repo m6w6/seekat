@@ -7,8 +7,7 @@ use Psr\Cache\CacheItemInterface;
 use Psr\Cache\CacheItemPoolInterface;
 use seekat\API\Call\Cache\Service;
 
-final class ItemPool implements Service
-{
+final class ItemPool implements Service {
 	/**
 	 * @var CacheItemPoolInterface
 	 */
@@ -23,6 +22,12 @@ final class ItemPool implements Service
 		$this->cache = $cache;
 	}
 
+	/**
+	 * @param string $key
+	 * @param Response|null $response
+	 * @return bool
+	 * @throws \Psr\Cache\InvalidArgumentException
+	 */
 	public function fetch(string $key, Response &$response = null) : bool {
 		$this->item = $this->cache->getItem($key);
 		if ($this->item->isHit()) {
@@ -35,6 +40,14 @@ final class ItemPool implements Service
 	public function store(string $key, Response $response) : bool {
 		$this->item->set($response);
 		return $this->cache->save($this->item);
+	}
+
+	/**
+	 * @param string $key
+	 * @throws \Psr\Cache\InvalidArgumentException
+	 */
+	public function del(string $key) {
+		$this->cache->deleteItem($key);
 	}
 
 	public function clear() {

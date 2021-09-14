@@ -3,7 +3,7 @@
 namespace seekat\Exception;
 
 /**
- * @param $message
+ * @param string|\Throwable $message
  * @return \Throwable
  */
 function exception(&$message) : \Throwable {
@@ -18,10 +18,10 @@ function exception(&$message) : \Throwable {
 
 /**
  * Canonical error message from a string or Exception
- * @param string|Exception $error
+ * @param string|\Throwable $error
  * @return string
  */
-function message(&$error) : string {
+function message(&$error) : ?string {
 	if ($error instanceof \Throwable) {
 		$message = $error->getMessage();
 	} else {

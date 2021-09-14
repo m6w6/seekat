@@ -12,10 +12,7 @@ class ErrorsTest extends BaseTest
 	function testCancellation($api) {
 		$promise = $api->users->m6w6();
 
-		if (!$api->getFuture()->cancelPromise($promise)) {
-			return;
-		}
-
+		$api->getFuture()->cancelPromise($promise);
 		$this->assertCancelled($promise);
 	}
 

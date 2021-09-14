@@ -5,7 +5,7 @@ require __DIR__."/../vendor/autoload.php";
 
 
 $log = new Monolog\Logger("seekat");
-$log->pushHandler(new Monolog\Handler\StreamHandler(STDERR, Monolog\Logger::DEBUG));
+$log->pushHandler(new Monolog\Handler\StreamHandler(STDERR, Monolog\Logger::WARNING));
 
 $api = new seekat\API(
 	seekat\API\Future\react(),

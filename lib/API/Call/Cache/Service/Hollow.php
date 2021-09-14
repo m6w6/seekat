@@ -5,8 +5,7 @@ namespace seekat\API\Call\Cache\Service;
 use http\Client\Response;
 use seekat\API\Call\Cache\Service;
 
-final class Hollow implements Service
-{
+final class Hollow implements Service {
 	private $storage = [];
 
 	public function fetch(string $key, Response &$response = null) : bool {
@@ -20,6 +19,10 @@ final class Hollow implements Service
 	public function store(string $key, Response $response) : bool {
 		$this->storage[$key] = $response;
 		return true;
+	}
+
+	public function del(string $key) {
+		unset($this->storage[$key]);
 	}
 
 	public function clear() {

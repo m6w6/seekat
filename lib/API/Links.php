@@ -2,17 +2,11 @@
 
 namespace seekat\API;
 
+use http\{Header, Params, QueryString, Url};
 use seekat\Exception\UnexpectedValueException;
-use http\ {
-	Header,
-	Params,
-	QueryString,
-	Url
-};
 use Serializable;
 
-final class Links implements Serializable
-{
+final class Links implements Serializable {
 	/**
 	 * Parsed "Link" relations
 	 * @var Params

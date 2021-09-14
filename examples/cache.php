@@ -32,6 +32,9 @@ $cache = new class($redis) implements \seekat\API\Call\Cache\Service {
 	function store(string $key, \http\Client\Response $response): bool {
 		return $this->redis->set($key, $response);
 	}
+	function del(string $key) {
+		return $this->redis->delete($key);
+	}
 };
 
 $api = new seekat\API(seekat\API\Future\react(), [

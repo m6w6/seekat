@@ -43,9 +43,6 @@ function logger() : \Monolog\Logger {
 
 class BaseTest extends \PHPUnit\Framework\TestCase
 {
-	/**
-	 * @return Generator
-	 */
 	function provideAPI() {
 		$auth = \seekat\API\auth("token", getenv("GITHUB_TOKEN"));
 		$headers = headers();
@@ -54,8 +51,8 @@ class BaseTest extends \PHPUnit\Framework\TestCase
 		$logger = logger();
 
 		return [
-			"with ReactPHP" => [new \seekat\API(\seekat\API\Future\react(), $headers, $url, $client, $logger)],
-			"with AmPHP"   => [new \seekat\API(\seekat\API\Future\amp(), $headers, $url, $client, $logger)],
+			"using ReactPHP" => [new \seekat\API(\seekat\API\Future\react(), $headers, $url, $client, $logger)],
+			"using AmPHP"   => [new \seekat\API(\seekat\API\Future\amp(), $headers, $url, $client, $logger)],
 		];
 	}
 }
@@ -128,23 +125,23 @@ trait AssertFailure
 	}
 }
 
-class CombinedTestdoxPrinter extends PHPUnit_TextUI_ResultPrinter
+class CombinedTestdoxPrinter extends PHPUnit\TextUI\DefaultResultPrinter
 {
-	function isTestClass(PHPUnit_Framework_TestSuite $suite) {
+	function isTestClass(PHPUnit\Framework\TestSuite $suite) {
 		$suiteName = $suite->getName();
 		return false === strpos($suiteName, "::")
 			&& substr($suiteName, -4) === "Test";
 	}
 
-	function startTestSuite(PHPUnit_Framework_TestSuite $suite) {
+	function startTestSuite(PHPUnit\Framework\TestSuite $suite) : void {
 		if ($this->isTestClass($suite)) {
 			$this->column = 0;
 		}
 
-		return parent::startTestSuite($suite);
+		parent::startTestSuite($suite);
 	}
 
-	function endTestSuite(PHPUnit_Framework_TestSuite $suite) {
+	function endTestSuite(PHPUnit\Framework\TestSuite $suite) : void {
 		/* print % progress */
 		if ($this->isTestClass($suite)) {
 			if ($this->numTestsRun != $this->numTests) {
@@ -162,35 +159,82 @@ class CombinedTestdoxPrinter extends PHPUnit_TextUI_ResultPrinter
 	}
 }
 
-class TestdoxListener extends PHPUnit_Util_TestDox_ResultPrinter_Text
+class TestdoxListener implements PHPUnit\Framework\TestListener
 {
 	private $groups;
+	private $testdox;
 
 	function __construct() {
-		parent::__construct("php://stdout", ["testdox"]);
-		$this->groups = new ReflectionProperty("PHPUnit_Util_TestDox_ResultPrinter", "groups");
+		$this->testdox = new PHPUnit\Util\TestDox\TextResultPrinter("php://stdout", ["testdox"]);
+		$this->groups = new ReflectionProperty("\PHPUnit\Util\TestDox\ResultPrinter", "groups");
 		$this->groups->setAccessible(true);
 	}
 
-	function startTest(PHPUnit_Framework_Test $test) {
+	function startTest(PHPUnit\Framework\Test $test) : void {
 		/* always show test class, even if no testdox test */
 		if ($test instanceof \PHPUnit\Framework\TestCase) {
 			if ($test->getGroups() == ["default"]) {
-				$this->groups->setValue($this, ["default"]);
+				$this->groups->setValue($this->testdox, ["default"]);
 			}
 		}
 
-		parent::startTest($test);
-		$this->groups->setValue($this, ["testdox"]);
+		$this->testdox->startTest($test);
+		$this->groups->setValue($this->testdox, ["testdox"]);
+	}
 
+	public function addError(\PHPUnit\Framework\Test $test, Throwable $t, float $time): void
+	{
+		$this->testdox->addError($test, $t, $time);
+	}
+
+	public function addWarning(\PHPUnit\Framework\Test $test, \PHPUnit\Framework\Warning $e, float $time): void
+	{
+		$this->testdox->addWarning($test, $e, $time);
+	}
+
+	public function addFailure(\PHPUnit\Framework\Test $test, \PHPUnit\Framework\AssertionFailedError $e, float $time): void
+	{
+		$this->testdox->addFailure($test, $e, $time);
+	}
+
+	public function addIncompleteTest(\PHPUnit\Framework\Test $test, Throwable $t, float $time): void
+	{
+		$this->testdox->addIncompleteTest($test, $t, $time);
+	}
+
+	public function addRiskyTest(\PHPUnit\Framework\Test $test, Throwable $t, float $time): void
+	{
+		$this->testdox->addRiskyTest($test, $t, $time);
+	}
+
+	public function addSkippedTest(\PHPUnit\Framework\Test $test, Throwable $t, float $time): void
+	{
+		$this->testdox->addSkippedTest($test, $t, $time);
+	}
+
+	public function startTestSuite(\PHPUnit\Framework\TestSuite $suite): void
+	{
+		$this->testdox->startTestSuite($suite);
+	}
+
+	public function endTestSuite(\PHPUnit\Framework\TestSuite $suite): void
+	{
+		$this->testdox->endTestSuite($suite);
+	}
+
+	public function endTest(\PHPUnit\Framework\Test $test, float $time): void
+	{
+		$this->testdox->endTest($test, $time);
 	}
 }
 
-class DebugLogListener extends PHPUnit\Framework\BaseTestListener
+class DebugLogListener implements \PHPUnit\Framework\TestListener
 {
+	use \PHPUnit\Framework\TestListenerDefaultImplementation;
+
 	private $printLog = false;
 
-	function endTest(PHPUnit_Framework_Test $test, $time) {
+	function endTest(PHPUnit\Framework\Test $test, float $time) : void {
 		/* @var $handler \Monolog\Handler\FingersCrossedHandler */
 		$handler = logger()->getHandlers()[0];
 		if ($this->printLog) {
@@ -201,11 +245,11 @@ class DebugLogListener extends PHPUnit\Framework\BaseTestListener
 		}
 	}
 
-	function addError(PHPUnit_Framework_Test $test, Exception $e, $time) {
+	function addError(PHPUnit\Framework\Test $test, \Throwable $e, float $time) : void {
 		$this->printLog = true;
 	}
 
-	function addFailure(PHPUnit_Framework_Test $test, PHPUnit_Framework_AssertionFailedError $e, $time) {
+	function addFailure(PHPUnit\Framework\Test $test, PHPUnit\Framework\AssertionFailedError $e, float $time) : void {
 		$this->printLog = true;
 	}
 

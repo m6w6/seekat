@@ -2,8 +2,7 @@
 
 namespace seekat\API;
 
-interface Future
-{
+interface Future {
 	/**
 	 * @param callable $onCancel
 	 * @return mixed Promisor providing a promise() method
@@ -26,7 +25,7 @@ interface Future
 	 * @param mixed $promise
 	 * @return bool
 	 */
-	function cancelPromise($promise) : bool;
+	function cancelPromise($promise);
 
 	/**
 	 * @param mixed $promise

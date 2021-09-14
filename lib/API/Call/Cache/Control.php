@@ -9,8 +9,7 @@ use http\Params;
 use http\QueryString;
 use http\Url;
 
-final class Control
-{
+final class Control {
 	/**
 	 * @var string
 	 */

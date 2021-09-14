@@ -4,6 +4,13 @@
 
 Fluent Github API access with PHP-7 and [ext-http](https://github.com/m6w6/ext-http).
 
+Support for the following promise providers built in:
+ * [ReactPHP](https://github.com/reactphp/promise)
+ * [AmPHP](https://github.com/amphp/amp)
+
+Supports plugging into your favourite event loop through
+[http\Client's custom event loop interface](https://mdref.m6w6.name/http/Client/Curl/User).
+
 Simple example:
 
 ```php
@@ -11,7 +18,7 @@ Simple example:
 
 use seekat\API;
 
-$api = new API;
+$api = new API(API\Future\react());
 
 $api->repos->m6w6->seekat->readme->as("html")->then(function($readme) {
 	echo $readme;
@@ -41,7 +48,7 @@ $cli->configure([
 $log = new Monolog\Logger("seekat");
 $log->pushHandler(new Monolog\Handler\StreamHandler(STDERR, Monolog\Logger::WARNING));
 
-$api = new API([
+$api = new API(API\Future\react(), [
 	"Authorization" => "token ".getenv("GITHUB_TOKEN")
 ], null, $cli, $log);
 
@@ -75,9 +82,6 @@ $api(function($api) {
 	}
 });
 ```
-
-
-> ***Note:*** WIP
 
 
 ## Installing

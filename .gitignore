@@ -11,3 +11,6 @@
 /perf*
 /tmp/
 /vendor/
+*.diff
+*.cache
+*.bak

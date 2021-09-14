@@ -2,36 +2,19 @@
 
 namespace seekat\API;
 
-use seekat\{
-	API, Exception\InvalidArgumentException, Exception\UnexpectedValueException
-};
-use http\{
-	Header, Message\Body
-};
+use http\Header;
+use http\Message\Body;
+use http\Params;
+use seekat\API;
+use seekat\API\ContentType\Handler;
+use seekat\Exception\InvalidArgumentException;
+use seekat\Exception\UnexpectedValueException;
 
-final class ContentType
-{
+final class ContentType {
 	/**
-	 * API version
 	 * @var int
 	 */
-	static private $version = 3;
-
-	/**
-	 * Content type handler map
-	 * @var array
-	 */
-	static private $types = [
-		"json"		=> "self::fromJson",
-		"base64"	=> "self::fromBase64",
-		"sha"		=> "self::fromData",
-		"raw"		=> "self::fromData",
-		"html"		=> "self::fromData",
-		"diff"		=> "self::fromData",
-		"patch"		=> "self::fromData",
-		"text/plain"=> "self::fromData",
-		"application/octet-stream" => "self::fromStream",
-	];
+	private $version;
 
 	/**
 	 * Content type abbreviation
@@ -40,12 +23,18 @@ final class ContentType
 	private $type;
 
 	/**
-	 * Register a content type handler
-	 * @param string $type The content type (abbreviation)
-	 * @param callable $handler The handler as function(Body $body):mixed;
+	 * Content type handler map
+	 * @var array
 	 */
-	static function register(string $type, callable $handler) {
-		self::$types[$type] = $handler;
+	static private $types = [];
+
+	/**
+	 * Register a content type handler
+	 */
+	static function register(Handler $handler) {
+		foreach ($handler->types() as $type) {
+			self::$types[$type] = $handler;
+		}
 	}
 
 	/**
@@ -66,102 +55,37 @@ final class ContentType
 	}
 
 	/**
-	 * Get/set the API version to use
-	 * @param int $v if not null, update the API version
-	 * @return int the previously set version
-	 */
-	static function version(int $v = null) : int {
-		$api = self::$version;
-		if (isset($v)) {
-			self::$version = $v;
-		}
-		return $api;
-	}
-
-	/**
-	 * @param API $api
+	 * API Version
+	 *
+	 * @param int $version
 	 * @param string $type
-	 * @return API
 	 */
-	static function apply(API $api, string $type) : API {
-		$part = "[^()<>@,;:\\\"\/\[\]?.=[:space:][:cntrl:]]+";
-		if (preg_match("/^$part\/$part\$/", $type)) {
-			$that = $api->withHeader("Accept", $type);
-		} else {
-			switch (substr($type, 0, 1)) {
-				case "+":
-				case ".":
-				case "":
-					break;
-				default:
-					$type = ".$type";
-					break;
-			}
-			$vapi = static::version();
-			$that = $api->withHeader("Accept", "application/vnd.github.v$vapi$type");
+	function __construct(int $version = 3, string $type = null) {
+		$this->version = $version;
+		if (isset($type)) {
+			$this->setContentType($this->extractTypeFromParams(new Params($type)));
 		}
-		return $that;
-	}
-
-	/**
-	 * @param Body $json
-	 * @return mixed
-	 * @throws UnexpectedValueException
-	 */
-	private static function fromJson(Body $json) {
-		$decoded = json_decode($json);
-		if (!isset($decoded) && json_last_error()) {
-			throw new UnexpectedValueException("Could not decode JSON: ".
-				json_last_error_msg());
-		}
-		return $decoded;
-	}
-
-	/**
-	 * @param Body $base64
-	 * @return string
-	 * @throws UnexpectedValueException
-	 */
-	private static function fromBase64(Body $base64) : string {
-		if (false === ($decoded = base64_decode($base64, true))) {
-			throw new UnexpectedValueException("Could not decode BASE64");
-		}
-		return $decoded;
-	}
-
-
-	/**
-	 * @param Body $stream
-	 * @return resource stream
-	 */
-	private static function fromStream(Body $stream) {
-		return $stream->getResource();
-	}
-
-	/**
-	 * @param Body $data
-	 * @return string
-	 */
-	private static function fromData(Body $data) : string {
-		return (string) $data;
 	}
 
 	/**
 	 * @param Header $contentType
-	 * @throws InvalidArgumentException
 	 */
-	function __construct(Header $contentType) {
-		if (strcasecmp($contentType->name, "Content-Type")) {
-			throw new InvalidArgumentException(
-				"Expected Content-Type header, got ". $contentType->name);
-		}
-		$vapi = static::version();
-		$this->type = preg_replace("/
-			(?:application\/(?:vnd\.github(?:\.v$vapi)?)?)
-			(?|
-					\.					([^.+]+)
-				|	(?:\.[^.+]+)?\+?	(json)
-			)/x", "\\1", current(array_keys($contentType->getParams()->params)));
+	function setContentTypeHeader(Header $contentType) {
+		$this->type = $this->extractTypeFromHeader($contentType);
+	}
+
+	/**
+	 * @param string $contentType
+	 */
+	function setContentType(string $contentType) {
+		$this->type = $this->extractType($contentType);
+	}
+
+	/**
+	 * @return int
+	 */
+	function getVersion() : int {
+		return $this->version;
 	}
 
 	/**
@@ -173,16 +97,90 @@ final class ContentType
 	}
 
 	/**
-	 * Parse a response message's body according to its content type
+	 * Get the (full) content type
+	 * @return string
+	 */
+	function getContentType() : string {
+		return $this->composeType($this->type);
+	}
+
+	/**
+	 * @param API $api
+	 * @return API clone
+	 */
+	function apply(API $api) : API {
+		return $api->withHeader("Accept", $this->getContentType());
+	}
+
+	/**
+	 * Decode a response message's body according to its content type
 	 * @param Body $data
 	 * @return mixed
 	 * @throws UnexpectedValueException
 	 */
-	function parseBody(Body $data) {
+	function decode(Body $data) {
 		$type = $this->getType();
 		if (static::registered($type)) {
-			return call_user_func(self::$types[$type], $data, $type);
+			return self::$types[$type]->decode($data);
 		}
 		throw new UnexpectedValueException("Unhandled content type '$type'");
 	}
+
+	/**
+	 * Encode a request message's body according to its content type
+	 * @param mixed $data
+	 * @return Body
+	 * @throws UnexpectedValueException
+	 */
+	function encode($data) : Body {
+		$type = $this->getType();
+		if (static::registered($type)) {
+			return self::$types[$type]->encode($data);
+		}
+		throw new UnexpectedValueException("Unhandled content type '$type'");
+	}
+
+	private function composeType(string $type) : string {
+		$part = "[^()<>@,;:\\\"\/\[\]?.=[:space:][:cntrl:]]+";
+		if (preg_match("/^$part\/$part\$/", $type)) {
+			return $type;
+		}
+
+		switch (substr($type, 0, 1)) {
+			case "+":
+			case ".":
+			case "":
+				break;
+			default:
+				$type = ".$type";
+				break;
+		}
+		return "application/vnd.github.v{$this->version}$type";
+	}
+
+	private function extractType(string $type) : string {
+		return preg_replace("/
+			(?:application\/(?:vnd\.github(?:\.v{$this->version})?)?)
+			(?|
+					\.					([^.+]+)
+				|	(?:\.[^.+]+)?\+?	(json)
+			)/x", "\\1", $type);
+	}
+
+	private function extractTypeFromParams(Params $params) : string {
+		return $this->extractType(current(array_keys($params->params)));
+	}
+
+	private function extractTypeFromHeader(Header $header) : string {
+		if (strcasecmp($header->name, "Content-Type")) {
+			throw new InvalidArgumentException(
+				"Expected Content-Type header, got ". $header->name);
+		}
+		return $this->extractTypeFromParams($header->getParams());
+	}
 }
+
+ContentType::register(new Handler\Text);
+ContentType::register(new Handler\Json);
+ContentType::register(new Handler\Base64);
+ContentType::register(new Handler\Stream);

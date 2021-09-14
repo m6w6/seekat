@@ -2,6 +2,5 @@
 
 namespace seekat;
 
-interface Exception
-{
+interface Exception {
 }
