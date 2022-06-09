@@ -11,12 +11,12 @@ namespace {
 
 namespace seekat {
 	/**
-	 * Generate a human readable representation of a variable
+	 * Generate a human-readable representation of a variable
 	 * @param mixed $arg
 	 * @param bool $export whether to var_export the $arg
 	 * @return string
 	 */
-	function typeof($arg, $export = false) {
+	function typeof($arg, bool $export = false) : string {
 		$type = is_object($arg)
 			? "instance of ".get_class($arg)
 			: gettype($arg);

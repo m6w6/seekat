@@ -36,11 +36,9 @@ final class Result {
 	}
 
 	/**
-	 * @param Response $response
-	 * @return null|API\Links
 	 * @throws RequestException
 	 */
-	private function checkResponseMeta(Response $response) {
+	private function checkResponseMeta(Response $response) : API\Links {
 		if ($response->getResponseCode() >= 400) {
 			$e = new RequestException($response);
 
@@ -59,11 +57,9 @@ final class Result {
 	}
 
 	/**
-	 * @param Response $response
-	 * @return API\ContentType
 	 * @throws RequestException
 	 */
-	private function checkResponseType(Response $response) {
+	private function checkResponseType(Response $response) : API\ContentType {
 		if (!($type = $response->getHeader("Content-Type", Header::class))) {
 			$e = new RequestException($response);
 
@@ -78,12 +74,9 @@ final class Result {
 	}
 
 	/**
-	 * @param Response $response
-	 * @param API\ContentType $type
-	 * @return mixed
 	 * @throws \Exception
 	 */
-	private function checkResponseBody(Response $response, API\ContentType $type) {
+	private function checkResponseBody(Response $response, API\ContentType $type) : mixed {
 		try {
 			$data = $type->decode($response->getBody());
 		} catch (\Exception $e) {

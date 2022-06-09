@@ -11,12 +11,11 @@ use seekat\API\Future;
  *
  * @return mixed promise
  */
-function first(API $api, Cache\Service $cache = null) {
-	$links = $api->getLinks();
-	if ($links && ($first = $links->getFirst())) {
-		return $api->withUrl($first)->get(null, null, $cache);
+function first(API $api) {
+	if (($first = $api->getLinks()?->getFirst())) {
+		return $api->withUrl($first)->get();
 	}
-	return Future\resolve($api->getFuture(), null);
+	return $api->getFuture()->resolve(null);
 }
 
 /**
@@ -24,12 +23,11 @@ function first(API $api, Cache\Service $cache = null) {
  *
  * @return mixed promise
  */
-function prev(API $api, Cache\Service $cache = null) {
-	$links = $api->getLinks();
-	if ($links && ($prev = $links->getPrev())) {
-		return $api->withUrl($prev)->get(null, null, $cache);
+function prev(API $api) {
+	if (($prev = $api->getLinks()?->getPrev())) {
+		return $api->withUrl($prev)->get();
 	}
-	return Future\resolve($api->getFuture(), null);
+	return $api->getFuture()->resolve(null);
 }
 
 /**
@@ -37,12 +35,11 @@ function prev(API $api, Cache\Service $cache = null) {
  *
  * @return mixed promise
  */
-function next(API $api, Cache\Service $cache = null) {
-	$links = $api->getLinks();
-	if ($links && ($next = $links->getNext())) {
-		return $api->withUrl($next)->get(null, null, $cache);
+function next(API $api) {
+	if (($next = $api->getLinks()?->getNext())) {
+		return $api->withUrl($next)->get();
 	}
-	return Future\resolve($api->getFuture(), null);
+	return $api->getFuture()->resolve(null);
 }
 
 /**
@@ -55,6 +52,6 @@ function last(API $api, Cache\Service $cache = null) {
 	if ($links && ($last = $links->getLast())) {
 		return $api->withUrl($last)->get(null, null, $cache);
 	}
-	return Future\resolve($api->getFuture(), null);
+	return $api->getFuture()->resolve(null);
 }
 

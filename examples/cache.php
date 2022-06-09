@@ -1,25 +1,16 @@
 #!/usr/bin/env php
 <?php
 
-require __DIR__."/../vendor/autoload.php";
-
-use Monolog\{
-	Handler\StreamHandler, Logger
-};
-
-$log = new Logger("seekat");
-$log->pushHandler(new StreamHandler(STDERR, Logger::INFO));
+require_once __DIR__ . "/../vendor/autoload.php";
 
 $redis = new Redis;
 $redis->connect("localhost");
 $redis->setOption(Redis::OPT_SERIALIZER, Redis::SERIALIZER_PHP);
 $cache = new class($redis) implements \seekat\API\Call\Cache\Service {
-	private $redis;
-	function __construct(Redis $redis) {
-		$this->redis = $redis;
+	function __construct(private readonly Redis $redis) {
 	}
-	function clear() {
-		return $this->redis->flushDB();
+	function clear() : void {
+		$this->redis->flushDB();
 	}
 	function fetch(string $key, \http\Client\Response &$response = null): bool {
 		list($exists, $response) = $this->redis
@@ -32,17 +23,17 @@ $cache = new class($redis) implements \seekat\API\Call\Cache\Service {
 	function store(string $key, \http\Client\Response $response): bool {
 		return $this->redis->set($key, $response);
 	}
-	function del(string $key) {
-		return $this->redis->delete($key);
+	function del(string $key) : void {
+		$this->redis->del($key);
 	}
 };
 
-$api = new seekat\API(seekat\API\Future\react(), [
-	"Authorization" => "token ".getenv("GITHUB_TOKEN")
-], null, null, $log, $cache);
+$log_level = "INFO";
+
+$api = include "examples.inc";
 
 $api(function($api) use($cache) {
 	yield $api->users->m6w6();
 	yield $api->users->m6w6();
-	$cache->clear();
+	//$cache->clear();
 });

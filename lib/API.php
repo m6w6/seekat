@@ -14,68 +14,31 @@ use seekat\Exception\InvalidArgumentException;
 class API implements IteratorAggregate, Countable {
 	/**
 	 * API version
-	 * @var int
 	 */
-	private $version = 3;
-
-	/**
-	 * The current API endpoint URL
-	 * @var Url
-	 */
-	private $url;
+	private int $version = 3;
 
 	/**
 	 * Default headers to send out to the API endpoint
-	 * @var array
 	 */
-	private $headers;
+	private array $headers;
 
 	/**
 	 * Current endpoints links
-	 * @var Links
 	 */
-	private $links;
+	private ?Links $links = null;
 
 	/**
 	 * Current endpoint data's Content-Type
-	 * @var API\ContentType
 	 */
-	private $type;
+	private API\ContentType $type;
 
 	/**
 	 * Current endpoint's data
-	 * @var array|object
 	 */
-	private $data;
-
-	/**
-	 * Logger
-	 * @var LoggerInterface
-	 */
-	private $logger;
-
-	/**
-	 * Cache
-	 * @var Call\Cache\Service
-	 */
-	private $cache;
-
-	/**
-	 * Promisor
-	 * @var Future
-	 */
-	private $future;
-
-	/**
-	 * The HTTP client
-	 * @var Client
-	 */
-	private $client;
+	private mixed $data = null;
 
 	/**
 	 * Create a new API endpoint root
-	 *
-	 * @codeCoverageIgnore
 	 *
 	 * @param Future $future pretending to fulfill promises
 	 * @param array $headers Standard request headers, defaults to ["Accept" => "application/vnd.github.v3+json"]
@@ -84,12 +47,12 @@ class API implements IteratorAggregate, Countable {
 	 * @param LoggerInterface $log A logger
 	 * @param Call\Cache\Service $cache A cache
 	 */
-	function __construct(Future $future, array $headers = null, Url $url = null, Client $client = null, LoggerInterface $log = null, Call\Cache\Service $cache = null) {
-		$this->future = $future;
-		$this->cache = $cache;
-		$this->logger = $log ?? new NullLogger;
-		$this->url = $url ?? new Url("https://api.github.com");
-		$this->client = $client ?? new Client;
+	function __construct(private readonly Future $future,
+						 array $headers = null,
+						 private Url $url = new Url("https://api.github.com"),
+						 private readonly Client $client = new Client,
+						 private readonly LoggerInterface $logger = new NullLogger,
+						 private readonly Call\Cache\Service $cache = new Call\Cache\Service\Hollow) {
 		$this->type = new ContentType($this->version, "json");
 		$this->headers = (array) $headers + [
 			"Accept" => $this->type->getContentType()
@@ -102,8 +65,8 @@ class API implements IteratorAggregate, Countable {
 	 * @param string|int $seg The "path" element to ascend into
 	 * @return API Endpoint clone referring to {$parent}/{$seg}
 	 */
-	function __get($seg) : API {
-		if (substr($seg, -4) === "_url") {
+	function __get(string|int $seg) : API {
+		if (str_ends_with($seg, "_url")) {
 			$url = new Url(uri_template($this->data->$seg));
 			$that = $this->withUrl($url);
 			$seg = basename($that->url->path);
@@ -158,8 +121,8 @@ class API implements IteratorAggregate, Countable {
 	 * @return mixed The promise of the generator's return value
 	 * @throws InvalidArgumentException
 	 */
-	function __invoke($cbg) {
-		$this->logger->debug(__FUNCTION__);
+	function __invoke(callable|Generator $cbg) {
+		$this->logger->debug(__METHOD__, [$cbg]);
 
 		$consumer = new Consumer($this->getFuture(), function() {
 				$this->client->send();
@@ -235,38 +198,27 @@ class API implements IteratorAggregate, Countable {
 		return $count;
 	}
 
-	/**
-	 * @return Url
-	 */
 	function getUrl() : Url {
 		return $this->url;
 	}
 
-	/**
-	 * @return LoggerInterface
-	 */
 	function getLogger() : LoggerInterface {
 		return $this->logger;
 	}
 
-	/**
-	 * @return Future
-	 */
-	function getFuture() {
+	function getFuture() : Future {
 		return $this->future;
 	}
 
-	/**
-	 * @return Client
-	 */
 	public function getClient(): Client {
 		return $this->client;
 	}
 
-	/**
-	 * @return array|object
-	 */
-	function getData() {
+	public function getCache() : Call\Cache\Service {
+		return $this->cache;
+	}
+
+	function getData() : mixed {
 		return $this->data;
 	}
 
@@ -275,7 +227,7 @@ class API implements IteratorAggregate, Countable {
 	 *
 	 * @return null|Links
 	 */
-	function getLinks() {
+	function getLinks() : ?Links {
 		return $this->links;
 	}
 
@@ -294,7 +246,7 @@ class API implements IteratorAggregate, Countable {
 	function export() : array {
 		$data = $this->data;
 		$url = clone $this->url;
-		$type = $this->type ? clone $this->type : null;
+		$type = clone $this->type;
 		$links = $this->links ? clone $this->links : null;
 		$headers = $this->headers;
 		return compact("url", "data", "type", "links", "headers");
@@ -322,7 +274,7 @@ class API implements IteratorAggregate, Countable {
 	 * @param mixed $data
 	 * @return API clone
 	 */
-	function withData($data) : API {
+	function withData(mixed $data) : API {
 		$that = clone $this;
 		$that->data = $data;
 		return $that;
@@ -349,7 +301,7 @@ class API implements IteratorAggregate, Countable {
 	 * @param mixed $value
 	 * @return API clone
 	 */
-	function withHeader(string $name, $value) : API {
+	function withHeader(string $name, mixed $value) : API {
 		$that = clone $this;
 		if (isset($value)) {
 			$that->headers[$name] = $value;
@@ -387,8 +339,8 @@ class API implements IteratorAggregate, Countable {
 	 * @param array $headers The request's additional HTTP headers
 	 * @return mixed promise
 	 */
-	function head($args = null, array $headers = null, $cache = null) {
-		return $this->request("HEAD", $args, null, $headers, $cache);
+	function head($args = null, array $headers = null) {
+		return $this->request("HEAD", $args, null, $headers);
 	}
 
 	/**
@@ -398,8 +350,8 @@ class API implements IteratorAggregate, Countable {
 	 * @param array $headers The request's additional HTTP headers
 	 * @return mixed promise
 	 */
-	function get($args = null, array $headers = null, $cache = null) {
-		return $this->request("GET", $args, null, $headers, $cache);
+	function get($args = null, array $headers = null) {
+		return $this->request("GET", $args, null, $headers);
 	}
 
 	/**
@@ -497,12 +449,11 @@ class API implements IteratorAggregate, Countable {
 	 *
 	 * @param string $method The HTTP request method
 	 * @param mixed $args The HTTP query string parameters
-	 * @param mixed $body Thee HTTP message's body
-	 * @param array $headers The request's additional HTTP headers
-	 * @param Call\Cache\Service $cache
+	 * @param mixed $body The HTTP message's body
+	 * @param ?array $headers The request's additional HTTP headers
 	 * @return mixed promise
 	 */
-	private function request(string $method, $args = null, $body = null, array $headers = null, Call\Cache\Service $cache = null) {
+	private function request(string $method, $args = null, $body = null, array $headers = null) {
 		if (isset($this->data)) {
 			$this->logger->debug("request -> resolve", [
 				"method"  => $method,
@@ -512,7 +463,7 @@ class API implements IteratorAggregate, Countable {
 				"headers" => $headers,
 			]);
 
-			return Future\resolve($this->future, $this);
+			return $this->future->resolve($this);
 		}
 
 		$url = $this->url->mod(["query" => new QueryString($args)]);
@@ -527,6 +478,6 @@ class API implements IteratorAggregate, Countable {
 			"headers" => $headers,
 		]);
 
-		return (new Call\Deferred($this, $request, $cache ?: $this->cache))();
+		return (new Call\Deferred($this, $request, $this->cache))();
 	}
 }

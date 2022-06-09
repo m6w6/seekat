@@ -1,19 +1,9 @@
 #!/usr/bin/env php
 <?php
 
-require_once __DIR__."/../vendor/autoload.php";
-
-use seekat\API;
 use seekat\API\Links;
 
-$log = new Monolog\Logger("seekat");
-$log->pushHandler((new Monolog\Handler\StreamHandler(STDERR))->setLevel(Monolog\Logger::INFO));
-
-$cli = new http\Client("curl", "seekat");
-
-$api = new API(API\Future\amp(), [
-	"Authorization" => "token ".getenv("GITHUB_TOKEN")
-], null, $cli, $log);
+$api = include "examples.inc";
 
 $api(function($api) {
 	$count = 0;

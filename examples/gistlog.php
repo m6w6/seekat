@@ -1,17 +1,6 @@
 #!/usr/bin/env php
 <?php
-
-require __DIR__."/../vendor/autoload.php";
-
-
-$log = new Monolog\Logger("seekat");
-$log->pushHandler(new Monolog\Handler\StreamHandler(STDERR, Monolog\Logger::WARNING));
-
-$api = new seekat\API(
-	seekat\API\Future\react(),
-	seekat\API\auth("token", getenv("GITHUB_TOKEN")),
-	null, null, $log
-);
+$api = include "examples.inc";
 
 $api(function($api) {
 	$gists = yield $api->users->m6w6->gists();

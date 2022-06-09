@@ -10,11 +10,6 @@ use function seekat\typeof;
 
 final class Json implements Handler {
 	/**
-	 * @var int
-	 */
-	private $flags;
-
-	/**
 	 * @inheritdoc
 	 */
 	function types() : array {
@@ -24,14 +19,13 @@ final class Json implements Handler {
 	/**
 	 * @param int $flags json_encode() flags
 	 */
-	function __construct(int $flags = 0) {
-		$this->flags = $flags;
+	function __construct(private readonly int $flags = 0) {
 	}
 
 	/**
 	 * @inheritdoc
 	 */
-	function encode($data): Body {
+	function encode(mixed $data): Body {
 		if (is_scalar($data)) {
 			$json = $data;
 		} else {
@@ -49,7 +43,7 @@ final class Json implements Handler {
 	/**
 	 * @inheritdoc
 	 */
-	function decode(Body $body) {
+	function decode(Body $body) : mixed {
 		$data = json_decode($body);
 		if (!isset($data) && json_last_error()) {
 			throw new UnexpectedValueException("Could not decode JSON: ".

@@ -6,29 +6,21 @@ class CacheTest extends BaseTest
 	use AssertSuccess;
 
 	/**
-	 * @var seekat\API\Call\Cache\Service
-	 */
-	private $cache;
-
-	function setUp() : void {
-		$this->cache = new seekat\API\Call\Cache\Service\Hollow;
-	}
-
-	/**
 	 * @group testdox
 	 * @dataProvider provideAPI
 	 */
 	function testCachesSuccessiveCalls($api) {
-		$m6w6 = $this->assertSuccess($api->users->m6w6, null, null, $this->cache);
-		$data = $this->cache->getStorage();
-		$m6w6_ = $this->assertSuccess($api->users->m6w6, null, null, $this->cache);
+		$api->getCache()->clear();
+		$m6w6 = $this->assertSuccess($api->users->m6w6);
+		$data = $api->getCache()->getStorage();
+		$m6w6_ = $this->assertSuccess($api->users->m6w6);
 
 		$this->assertEquals("m6w6", $m6w6->login);
 		$this->assertEquals("m6w6", $m6w6_->login);
 
 		$this->assertIsArray($data);
 		$this->assertCount(1, $data);
-		$this->assertEquals($data, $this->cache->getStorage());
+		$this->assertEquals($data, $api->getCache()->getStorage());
 	}
 
 	/**
@@ -36,6 +28,25 @@ class CacheTest extends BaseTest
 	 * @dataProvider provideAPI
 	 */
 	function testRefreshesStaleCacheEntries($api) {
-		$this->markTestIncomplete("TODO");
+		$api->getCache()->clear();
+		$m6w6 = $this->assertSuccess($api->users->m6w6);
+
+		$data = $api->getCache()->getStorage();
+		/* @var \http\Header $resp */
+		$resp = current($data);
+		$resp->setHeader("X-Cache-Time", null);
+		$resp->setHeader("Cache-Control", null);
+		$resp->setHeader("Expires", 0);
+
+		$m6w6_ = $this->assertSuccess($api->users->m6w6);
+
+		$this->assertEquals("m6w6", $m6w6->login);
+		$this->assertEquals("m6w6", $m6w6_->login);
+
+		$this->assertIsArray($data);
+		$this->assertCount(1, $data);
+		$this->assertEquals($data, $api->getCache()->getStorage());
+
+		$this->assertIsNumeric($resp->getHeader("X-Cache-Time"));
 	}
 }

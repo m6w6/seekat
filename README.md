@@ -2,7 +2,7 @@
 
 [![Build Status](https://travis-ci.org/m6w6/seekat.svg)](https://travis-ci.org/m6w6/seekat)
 
-Fluent Github API access with PHP-7 and [ext-http](https://github.com/m6w6/ext-http).
+Fluent Github API access with [ext-http](https://github.com/m6w6/ext-http).
 
 Support for the following promise providers built in:
  * [ReactPHP](https://github.com/reactphp/promise)

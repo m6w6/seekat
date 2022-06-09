@@ -10,10 +10,7 @@ use http\QueryString;
 use http\Url;
 
 final class Control {
-	/**
-	 * @var string
-	 */
-	private $key;
+	private string $key;
 
 	/**
 	 * @param Request $request

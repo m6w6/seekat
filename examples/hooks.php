@@ -3,20 +3,15 @@
 
 require_once __DIR__."/../vendor/autoload.php";
 
-use seekat\{API, API\Future, API\Links};
-use Monolog\{Logger, Handler};
+use seekat\API\Links;
 
-$cli = new http\Client("curl", "seekat");
-$cli->configure([
+$client = new http\Client("curl", "seekat");
+$client->configure([
 	"max_host_connections" => 10,
 	"max_total_connections" => 50,
 	"use_eventloop" => true,
 ]);
-
-$log = new Logger("seekat");
-$log->pushHandler(new Handler\StreamHandler(STDERR, Logger::NOTICE));
-
-$api = new API(Future\react(), API\auth("token", getenv("GITHUB_TOKEN")), null, $cli, $log);
+$api = include "examples.inc";
 
 $api(function() use($api) {
 	$repos = yield $api->users->m6w6->repos([

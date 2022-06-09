@@ -7,21 +7,17 @@ use http\Message\Body;
 interface Handler {
 	/**
 	 * List handled types
-	 * @return array
+	 * @return string[]
 	 */
 	function types() : array;
 
 	/**
 	 * Decode HTTP message body
-	 * @param Body $body
-	 * @return mixed
 	 */
-	function decode(Body $body);
+	function decode(Body $body) : mixed;
 
 	/**
 	 * Encode HTTP message body
-	 * @param $data
-	 * @return Body
 	 */
-	function encode($data) : Body;
+	function encode(mixed $data) : Body;
 }

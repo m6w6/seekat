@@ -48,7 +48,7 @@ class ContentTypeTest extends BaseTest
 			function encode($data): Body {
 				return new Body;
 			}
-			function decode(Body $body) {
+			function decode(Body $body) : string {
 				return (string) $body;
 			}
 		});

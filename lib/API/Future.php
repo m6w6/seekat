@@ -5,54 +5,52 @@ namespace seekat\API;
 interface Future {
 	/**
 	 * @param callable $onCancel
-	 * @return mixed Promisor providing a promise() method
+	 * @return object Promisor providing a promise() method
 	 */
-	function createContext(callable $onCancel = null);
+	function createContext(callable $onCancel = null) : object;
 
 	/**
-	 * @param object $context Promisor
-	 * @return mixed promise
+	 * @return object promise
 	 */
-	function getPromise($context);
+	function getPromise(object $context) : object;
+
+	function isPromise(object $promise) : bool;
+
+	function cancelPromise(object $promise) : void;
 
 	/**
-	 * @param mixed $promise
-	 * @return bool
+	 * @return object promise
 	 */
-	function isPromise($promise) : bool;
+	function handlePromise(object $promise, callable $onResult = null, callable $onError = null) : object;
 
 	/**
-	 * @param mixed $promise
-	 * @return bool
+	 * Create an immediately resolved promise
 	 */
-	function cancelPromise($promise);
-
-	/**
-	 * @param mixed $promise
-	 * @param callable|null $onResult
-	 * @param callable|null $onError
-	 * @return mixed promise
-	 */
-	function handlePromise($promise, callable $onResult = null, callable $onError = null);
+	function resolve(mixed $value) : object;
 
 	/**
 	 * @param object $context Promisor returned by createContext
-	 * @param mixed $value
-	 * @return void
 	 */
-	function resolve($context, $value);
+	function resolver(object $context) : \Closure;
+
+	/**
+	 * Create an immediately rejected promise
+	 */
+	function reject(mixed $reason) : object;
 
 	/**
 	 * @param object $context Promisor returned by createContext
-	 * @param mixed $reason
-	 * @return void
 	 */
-	function reject($context, $reason);
+	function rejecter(object $context) : \Closure;
 
 	/**
-	 * @param object $context Promisor returned by createContext
 	 * @param array $promises
-	 * @return mixed promise
+	 * @return object promise
 	 */
-	function all($context, array $promises);
+	function all(array $promises) : object;
+
+	/**
+	 *
+	 */
+	function reducer() : \Closure;
 }

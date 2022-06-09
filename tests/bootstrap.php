@@ -44,15 +44,12 @@ function logger() : \Monolog\Logger {
 class BaseTest extends \PHPUnit\Framework\TestCase
 {
 	function provideAPI() {
-		$auth = \seekat\API\auth("token", getenv("GITHUB_TOKEN"));
 		$headers = headers();
-		$url = null;
-		$client = null;
 		$logger = logger();
 
 		return [
-			"using ReactPHP" => [new \seekat\API(\seekat\API\Future\react(), $headers, $url, $client, $logger)],
-			"using AmPHP"   => [new \seekat\API(\seekat\API\Future\amp(), $headers, $url, $client, $logger)],
+			"using ReactPHP" => [new \seekat\API(\seekat\API\Future\react(), $headers, logger: $logger)],
+			"using AmPHP"   => [new \seekat\API(\seekat\API\Future\amp(), $headers, logger: $logger)],
 		];
 	}
 }

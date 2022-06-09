@@ -17,21 +17,20 @@ final class Text implements Handler {
 
 	/**
 	 * @inheritdoc
-	 * @param string $data
 	 */
-	function encode($data): Body {
+	function encode(mixed $data): Body {
 		if (isset($data) && !is_scalar($data)) {
 			throw new InvalidArgumentException(
 				"Text encoding argument must be scalar, got ".typeof($data));
 		}
-		return (new Body)->append($data);
+		return (new Body)->append((string) $data);
 	}
 
 	/**
 	 * @inheritdoc
 	 * @return string
 	 */
-	function decode(Body $body) {
+	function decode(Body $body) : string {
 		return (string) $body;
 	}
 }

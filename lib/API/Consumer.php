@@ -9,63 +9,36 @@ use seekat\Exception\{function exception};
 
 final class Consumer {
 	/**
-	 * Loop
-	 * @var callable
-	 */
-	private $loop;
-
-	/**
 	 * The return value of the generator
 	 * @var mixed
 	 */
-	private $result;
+	private mixed $result = null;
 
 	/**
 	 * Cancellation flag
-	 * @var bool
 	 */
-	private $cancelled = false;
+	private bool $cancelled = false;
 
 	/**
-	 * @var Future
+	 * Promise
 	 */
-	private $future;
+	private object $promise;
 
-	/**
-	 * @var mixed
-	 */
-	private $context;
-
-	/**
-	 * @var \Closure
-	 */
-	private $resolve;
-
-	/**
-	 * @var \Closure
-	 */
-	private $reject;
-
-	/**
-	 * @var \Closure
-	 */
-	private $reduce;
+	private \Closure $resolve;
+	private \Closure $reject;
+	private \Closure $reduce;
 
 	/**
 	 * Create a new generator consumer
-	 * @param Future $future
-	 * @param callable $loop
 	 */
-	function __construct(Future $future, callable $loop) {
-		$this->loop = $loop;
-
-		$this->future = $future;
-		$this->context = $future->createContext(function() {
+	function __construct(private readonly Future $future, private readonly \Closure $loop) {
+		$context = $future->createContext(function() {
 			$this->cancelled = true;
 		});
-		$this->resolve = API\Future\resolver($future, $this->context);
-		$this->reject = API\Future\rejecter($future, $this->context);
-		$this->reduce = API\Future\reducer($future, $this->context);
+		$this->promise = $future->getPromise($context);
+		$this->resolve = $future->resolver($context);
+		$this->reject = $future->rejecter($context);
+		$this->reduce = $future->reducer();
 	}
 
 	/**
@@ -74,7 +47,7 @@ final class Consumer {
 	 * @param Generator $gen
 	 * @return mixed promise
 	 */
-	function __invoke(Generator $gen) {
+	function __invoke(Generator $gen) : mixed {
 		$this->cancelled = false;
 		foreach ($gen as $promise) {
 			if ($this->cancelled) {
@@ -85,15 +58,16 @@ final class Consumer {
 
 		if ($this->cancelled) {
 			($this->reject)("Cancelled");
-		} else {
+		} else if (!$gen->valid()) {
 			try {
 				$this->result = $gen->getReturn();
 			} catch (Exception $e) {
+				assert($e->getMessage() === "Cannot get return value of a generator that hasn't returned");
 			}
-			($this->resolve)($this->result);
 		}
+		($this->resolve)($this->result);
 
-		return $this->context->promise();
+		return $this->promise;
 	}
 
 	/**
@@ -102,7 +76,7 @@ final class Consumer {
 	 * @param mixed $promise
 	 * @param Generator $gen
 	 */
-	private function give($promise, Generator $gen) {
+	private function give(mixed $promise, Generator $gen) : void {
 		if ($promise instanceof \Traversable) {
 			$promise = iterator_to_array($promise);
 		}

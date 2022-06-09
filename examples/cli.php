@@ -1,11 +1,8 @@
 #!/usr/bin/env php
 <?php
 
-require_once __DIR__."/../vendor/autoload.php";
+$api = include "examples.inc";
 
-$api = new seekat\API(seekat\API\Future\react(), [
-	"Authorization" => "token ".getenv("GITHUB_TOKEN")
-]);
 array_shift($argv);
 
 ($self = function($api) use(&$self) {

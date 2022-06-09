@@ -24,20 +24,20 @@
     "minimum-stability": "dev",
     "prefer-stable": true,
     "require": {
-        "php": ">=7.2",
-        "ext-http": ">=3.2",
+        "php": ">=8.1",
+        "ext-http": ">=4.2",
         "ext-json": "*",
-        "psr/log": "^1.0",
-        "psr/cache": "^1.0",
-        "psr/simple-cache": "^1.0",
-        "rize/uri-template": "^0.3.3"
+        "psr/log": "^3",
+        "psr/cache": "^1",
+        "psr/simple-cache": "^1",
+        "rize/uri-template": "^0.3.4",
+        "monolog/monolog": "^3"
     },
     "require-dev": {
-        "php": "^8",
+        "php": ">=8.1",
         "amphp/amp": "^2",
         "react/promise": "^2",
-        "monolog/monolog": "*",
-        "phpunit/phpunit": "*",
+        "phpunit/phpunit": "^9",
         "squizlabs/php_codesniffer": "*",
         "phpcompatibility/php-compatibility": "*"
     }

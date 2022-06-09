@@ -2,12 +2,14 @@
 
 namespace seekat\Exception;
 
+use Throwable;
+
 /**
- * @param string|\Throwable $message
- * @return \Throwable
+ * @param string|Throwable $message
+ * @return Throwable
  */
-function exception(&$message) : \Throwable {
-	if ($message instanceof \Throwable){
+function exception(&$message) : Throwable {
+	if ($message instanceof Throwable){
 		$exception = $message;
 		$message = $exception->getMessage();
 	} else {
@@ -18,11 +20,10 @@ function exception(&$message) : \Throwable {
 
 /**
  * Canonical error message from a string or Exception
- * @param string|\Throwable $error
- * @return string
+ * @param string|Throwable $error
  */
 function message(&$error) : ?string {
-	if ($error instanceof \Throwable) {
+	if ($error instanceof Throwable) {
 		$message = $error->getMessage();
 	} else {
 		$message = $error;

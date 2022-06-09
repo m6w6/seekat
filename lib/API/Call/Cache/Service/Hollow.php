@@ -6,7 +6,7 @@ use http\Client\Response;
 use seekat\API\Call\Cache\Service;
 
 final class Hollow implements Service {
-	private $storage = [];
+	private array $storage = [];
 
 	public function fetch(string $key, Response &$response = null) : bool {
 		if (isset($this->storage[$key])) {
@@ -21,11 +21,11 @@ final class Hollow implements Service {
 		return true;
 	}
 
-	public function del(string $key) {
+	public function del(string $key) : void {
 		unset($this->storage[$key]);
 	}
 
-	public function clear() {
+	public function clear() : void {
 		$this->storage = [];
 	}
 

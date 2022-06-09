@@ -7,13 +7,7 @@ use Psr\SimpleCache\CacheInterface;
 use seekat\API\Call\Cache\Service;
 
 final class Simple implements Service {
-	/**
-	 * @var CacheInterface
-	 */
-	private $cache;
-
-	public function __construct(CacheInterface $cache) {
-		$this->cache = $cache;
+	public function __construct(private readonly CacheInterface $cache) {
 	}
 
 	public function fetch(string $key, Response &$response = null) : bool {
@@ -25,11 +19,11 @@ final class Simple implements Service {
 		return $this->cache->set($key, $response);
 	}
 
-	public function del(string $key) {
+	public function del(string $key) : void {
 		$this->cache->delete($key);
 	}
 
-	public function clear() {
+	public function clear() : void {
 		$this->cache->clear();
 	}
 }

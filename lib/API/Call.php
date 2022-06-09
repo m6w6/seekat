@@ -6,19 +6,7 @@ use http\Url;
 use seekat\API;
 
 final class Call {
-	/**
-	 * @var API
-	 */
-	private $api;
-
-	/**
-	 * @var string
-	 */
-	private $call;
-
-	function __construct(API $api, string $call) {
-		$this->api = $api;
-		$this->call = $call;
+	function __construct(private readonly API $api, private readonly string $call) {
 	}
 
 	function __invoke(array $args) {

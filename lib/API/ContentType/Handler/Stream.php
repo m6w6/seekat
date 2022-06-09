@@ -17,7 +17,7 @@ final class Stream implements Handler {
 	 * @inheritdoc
 	 * @param resource $data
 	 */
-	function encode($data): Body {
+	function encode(mixed $data): Body {
 		return new Body($data);
 	}
 
@@ -25,7 +25,7 @@ final class Stream implements Handler {
 	 * @inheritdoc
 	 * @return resource
 	 */
-	function decode(Body $body) {
+	function decode(Body $body) : mixed {
 		return $body->getResource();
 	}
 }

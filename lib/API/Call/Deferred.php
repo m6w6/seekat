@@ -7,74 +7,34 @@ use Psr\Log\LoggerInterface;
 use seekat\API;
 
 final class Deferred {
-	/**
-	 * The response importer
-	 *
-	 * @var Result
-	 */
-	private $result;
-
-	/**
-	 * The HTTP client
-	 *
-	 * @var Client
-	 */
-	private $client;
-
-	/**
-	 * Request cache
-	 *
-	 * @var callable
-	 */
-	private $cache;
-
-	/**
-	 * @var LoggerInterface
-	 */
-	private $logger;
-
-	/**
-	 * The executed request
-	 *
-	 * @var Request
-	 */
-	private $request;
+	private Result $result;
+	private Client $client;
+	private LoggerInterface $logger;
+	private Cache $cache;
 
 	/**
 	 * The promised response
-	 *
-	 * @var Response
 	 */
-	private $response;
+	private ?Response $response = null;
 
 	/**
 	 * @var mixed
 	 */
-	private $promise;
-
-	/**
-	 * @var \Closure
-	 */
-	private $resolve;
-
-	/**
-	 * @var \Closure
-	 */
-	private $reject;
+	private object $promise;
+	private \Closure $resolve;
+	private \Closure $reject;
 
 	/**
 	 * Create a deferred promise for the response of $request
 	 *
 	 * @param API $api The endpoint of the request
 	 * @param Request $request The request to execute
-	 * @param Cache\Service $cache
 	 */
-	function __construct(API $api, Request $request, Cache\Service $cache = null) {
-		$this->request = $request;
+	function __construct(API $api, private readonly Request $request) {
+		$this->result = new Result($api);
 		$this->client = $api->getClient();
 		$this->logger = $api->getLogger();
-		$this->result = new Result($api);
-		$this->cache = new Cache($cache);
+		$this->cache  = new Cache($this->logger, $api->getCache());
 
 		$future = $api->getFuture();
 		$context = $future->createContext(function() {
@@ -87,8 +47,8 @@ final class Deferred {
 			}
 		});
 		$this->promise = $future->getPromise($context);
-		$this->resolve = API\Future\resolver($future, $context);
-		$this->reject = API\Future\rejecter($future, $context);
+		$this->resolve = $future->resolver($context);
+		$this->reject = $future->rejecter($context);
 	}
 
 	function __invoke() {
@@ -133,12 +93,7 @@ final class Deferred {
 		return true;
 	}
 
-	/**
-	 * Refresh
-	 *
-	 * @param Response|null $cached
-	 */
-	private function refresh(Response $cached = null) {
+	private function refresh(Response $cached = null) : void {
 		$this->client->enqueue($this->request, function(Response $response) use($cached) {
 			$this->response = $response;
 			$this->complete();
@@ -157,7 +112,9 @@ final class Deferred {
 	/**
 	 * Completion callback
 	 */
-	private function complete(string $by = "enqueued") {
+	private function complete(string $by = "enqueued") : void {
+		$this->logger->info("complete -> $by");
+
 		if ($this->response) {
 			$this->logger->info("$by -> response", [
 				"url"  => $this->request->getRequestUrl(),
@@ -168,6 +125,7 @@ final class Deferred {
 				$this->cache->update($this->request, $this->response);
 				($this->resolve)(($this->result)($this->response));
 			} catch (\Throwable $e) {
+				$this->logger->warning("$by -> cache", ["exception" => $e]);
 				($this->reject)($e);
 			}
 		} else {

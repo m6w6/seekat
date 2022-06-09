@@ -1,11 +1,7 @@
 #!/usr/bin/env php
 <?php
 
-require_once __DIR__."/../vendor/autoload.php";
-
-use seekat\API;
-
-$api = new API(API\Future\amp(), API\auth("token", getenv("GITHUB_TOKEN")));
+$api = include "examples.inc";
 
 $api->users->m6w6->gists()->onResolve(function($error, $gists) {
 	$error and die($error);
@@ -17,7 +13,7 @@ $api->users->m6w6->gists()->onResolve(function($error, $gists) {
 					printf("\nGist %s, %s:\n", $gist->id, $gist->description ?: "<no title>");
 				}
 				$cs = $commit->change_status;
-				printf("\t%s: ", substr($commit->version,0,8));
+				printf("\t%s: ", substr($commit->version, 0, 8));
 				printf("-%s+%s=%s\n", $cs->deletions, $cs->additions, $cs->total);
 			}
 		});
